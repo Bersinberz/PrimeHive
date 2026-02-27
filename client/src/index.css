@@ -1,0 +1,55 @@
+:root {
+  --prime-orange: #FF8C42;
+  --prime-deep: #FF6B2B;
+  --prime-gradient: linear-gradient(135deg, #FF8C42 0%, #FF6B2B 100%);
+  --prime-shadow: 0 15px 35px rgba(255, 107, 43, 0.2);
+  
+  --prime-accent-gold: #D4AF37;
+  --prime-accent-berry: #E94E77;
+  --prime-shopping-gradient: linear-gradient(
+    45deg, 
+    #FF8C42, 
+    #FF6B2B, 
+    #D4AF37, 
+    #FF8C42
+  );
+
+  --prime-dark: #1A1A1A;
+  --prime-glass: rgba(255, 255, 255, 0.8);
+  --prime-border: #E8E8E8;
+  --prime-bg-soft: #FDFCFB;
+}
+
+@keyframes brand-breathe {
+  0% {
+    background-position: 0% 50%;
+    filter: brightness(1);
+  }
+  50% {
+    background-position: 100% 50%;
+    filter: brightness(1.15) saturate(1.2);
+    text-shadow: 0 0 15px rgba(255, 140, 66, 0.2);
+  }
+  100% {
+    background-position: 0% 50%;
+    filter: brightness(1);
+  }
+}
+
+.brand-name-breathe {
+  background: var(--prime-shopping-gradient);
+  background-size: 300% 300%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  display: inline-block;
+  animation: brand-breathe 6s ease-in-out infinite;
+  letter-spacing: -1.5px;
+  font-weight: 800;
+}
+
+input.form-control:focus {
+  outline: none !important;
+  border-color: var(--prime-orange) !important;
+  box-shadow: 0 0 0 4px rgba(255, 140, 66, 0.1) !important;
+}
