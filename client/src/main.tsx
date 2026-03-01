@@ -8,9 +8,11 @@ import "bootstrap/dist/js/bootstrap.bundle.min.js";
 import "./index.css";
 
 import App from "./App";
+import GlobalErrorOverlay from "./components/GlobalErrorOverlay";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
+    <GlobalErrorOverlay />
     <App />
   </StrictMode>
 );

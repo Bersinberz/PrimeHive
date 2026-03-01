@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import Logo from "../assets/Logo.png";
+import Logo from "../../assets/Logo.png";
 import { motion } from 'framer-motion';
 
 interface LoginFormProps {
