@@ -18,6 +18,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
     fullName: '',
     email: '',
     phone: '',
+    dateOfBirth: '', // Added new field
     password: ''
   });
   
@@ -32,6 +33,15 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
     boxShadow: 'var(--prime-shadow)',
     transition: 'all 0.3s ease'
   };
+
+  // Real-time password validation checks
+  const passwordRequirements = [
+    { id: 'length', text: 'At least 6 characters', isValid: formData.password.length >= 6 },
+    { id: 'uppercase', text: 'One uppercase letter', isValid: /[A-Z]/.test(formData.password) },
+    { id: 'lowercase', text: 'One lowercase letter', isValid: /[a-z]/.test(formData.password) },
+    { id: 'number', text: 'One number', isValid: /[0-9]/.test(formData.password) },
+    { id: 'special', text: 'One special character', isValid: /[!@#$%^&*(),.?":{}|<>]/.test(formData.password) }
+  ];
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
@@ -63,6 +73,17 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
       }
     }
 
+    if (step === 3) {
+      if (!formData.phone || formData.phone.length < 10) {
+        setError("Please enter a valid 10-digit phone number.");
+        return;
+      }
+      if (!formData.dateOfBirth) {
+        setError("Please enter your date of birth.");
+        return;
+      }
+    }
+
     setStep((prev) => prev + 1);
   };
 
@@ -76,50 +97,27 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
     setLoading(true);
     setError(null);
 
-    // Validate Phone
-    if (!formData.phone || formData.phone.length < 10) {
-      setError("Please enter a valid 10-digit phone number.");
-      setLoading(false);
-      return;
-    }
-
-    // Validate Password
-    const pass = formData.password;
-    if (pass.length < 6) {
-      setError("Password must be at least 6 characters long.");
-      setLoading(false);
-      return;
-    }
-    if (!/[A-Z]/.test(pass)) {
-      setError("Password must contain at least one uppercase letter.");
-      setLoading(false);
-      return;
-    }
-    if (!/[a-z]/.test(pass)) {
-      setError("Password must contain at least one lowercase letter.");
-      setLoading(false);
-      return;
-    }
-    if (!/[0-9]/.test(pass)) {
-      setError("Password must contain at least one number.");
-      setLoading(false);
-      return;
-    }
-    if (!/[!@#$%^&*(),.?":{}|<>]/.test(pass)) {
-      setError("Password must contain at least one special character.");
+    // Check if all live password requirements are met
+    const isPasswordValid = passwordRequirements.every(req => req.isValid);
+    if (!isPasswordValid) {
+      setError("Please ensure your password meets all requirements.");
       setLoading(false);
       return;
     }
 
     try {
       setShowLoader(true);
+      
       await signupUser({
         name: formData.fullName,
         email: formData.email,
         phone: `+91${formData.phone}`, 
         password: formData.password,
+        dateOfBirth: formData.dateOfBirth 
       });
 
+      console.log("Account created successfully!");
+      
       setTimeout(() => {
         setIsLogin(true);
       }, 1500);
@@ -187,9 +185,9 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
             <p className="text-muted">Create an account to unlock exclusive member deals.</p>
           </div>
 
-          {/* Reduced progress indicators to 3 steps */}
+          {/* Updated to 4 steps */}
           <div className="d-flex gap-2 mb-4">
-            {[1, 2, 3].map((num) => (
+            {[1, 2, 3, 4].map((num) => (
               <div 
                 key={num} 
                 className="flex-grow-1 rounded-pill"
@@ -208,7 +206,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
             </div>
           )}
 
-          <form onSubmit={step === 3 ? handleSubmit : (e) => { e.preventDefault(); handleNext(); }}>
+          <form onSubmit={step === 4 ? handleSubmit : (e) => { e.preventDefault(); handleNext(); }}>
             <div style={{ minHeight: '180px' }}>
               <AnimatePresence mode="wait">
                 
@@ -276,7 +274,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
                   </motion.div>
                 )}
 
-                {/* Combined Step 3: Phone and Password */}
+                {/* Step 3: Phone and Date of Birth */}
                 {step === 3 && (
                   <motion.div key="step-3" variants={slideVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.3 }}>
                     <div className="mb-3">
@@ -312,18 +310,36 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
                       </div>
                     </div>
 
+                    <div className="mb-3">
+                      <label className="small fw-bold text-muted mb-2 text-uppercase" style={{ letterSpacing: '1px' }}>Date of Birth</label>
+                      <input
+                        type="date"
+                        id="dateOfBirth"
+                        className="form-control form-control-lg shadow-none py-2 fs-6 text-muted"
+                        style={{ border: '1.5px solid var(--prime-border)', borderRadius: '12px' }}
+                        value={formData.dateOfBirth}
+                        onChange={handleChange}
+                      />
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Step 4: Password setup */}
+                {step === 4 && (
+                  <motion.div key="step-4" variants={slideVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.3 }}>
                     <div className="mb-4">
-                      <label className="small fw-bold text-muted mb-2 text-uppercase" style={{ letterSpacing: '1px' }}>Password</label>
+                      <label className="small fw-bold text-muted mb-2 text-uppercase" style={{ letterSpacing: '1px' }}>Create Password</label>
                       <div className="position-relative">
                         <input
                           type={showPassword ? "text" : "password"}
                           id="password"
                           className="form-control form-control-lg shadow-none py-2 fs-6 pe-5"
-                          placeholder="Create a password"
+                          placeholder="Create a strong password"
                           style={{ border: '1.5px solid var(--prime-border)', borderRadius: '12px' }}
                           value={formData.password}
                           autoComplete='off'
                           onChange={handleChange}
+                          autoFocus
                         />
                         <button
                           type="button"
@@ -339,9 +355,20 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
                         </button>
                       </div>
                       
-                      <div className="mt-2 small text-muted" style={{ fontSize: '0.75rem', lineHeight: '1.4' }}>
-                        Must contain at least 6 characters, one uppercase, one lowercase, one number, and one special character.
+                      {/* Live Password Checker */}
+                      <div className="mt-3">
+                        {passwordRequirements.map((req) => (
+                          <div key={req.id} className={`d-flex align-items-center mb-1 small ${req.isValid ? 'text-success fw-medium' : 'text-muted'}`} style={{ transition: 'color 0.3s' }}>
+                            {req.isValid ? (
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="me-2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            ) : (
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="me-2"><circle cx="12" cy="12" r="10"></circle></svg>
+                            )}
+                            {req.text}
+                          </div>
+                        ))}
                       </div>
+
                     </div>
                   </motion.div>
                 )}
@@ -351,8 +378,8 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
             <motion.button
               whileHover={!loading ? { scale: 1.01 } : {}}
               whileTap={!loading ? { scale: 0.98 } : {}}
-              type={step === 3 ? "submit" : "button"}
-              onClick={step < 3 ? handleNext : undefined}
+              type={step === 4 ? "submit" : "button"}
+              onClick={step < 4 ? handleNext : undefined}
               disabled={loading}
               className="btn btn-lg w-100 py-3 fw-bold text-white mb-4 mt-2"
               style={{
@@ -363,7 +390,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
                 cursor: loading ? 'not-allowed' : 'pointer'
               }}
             >
-              {step < 3 ? "Continue" : "Create Account"}
+              {step < 4 ? "Continue" : "Create Account"}
             </motion.button>
           </form>
 
