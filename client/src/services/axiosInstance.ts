@@ -21,7 +21,6 @@ axiosInstance.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
     if (!error.response) {
-      // Network error broadcast
       window.dispatchEvent(new CustomEvent('api-error', { 
         detail: { status: 0, message: "Network error. Please check your connection." } 
       }));
@@ -30,7 +29,6 @@ axiosInstance.interceptors.response.use(
 
     const { status, data } = error.response;
 
-    // Broadcast the error to the React UI
     window.dispatchEvent(new CustomEvent('api-error', { 
       detail: { status, message: (data as any)?.message || "Something went wrong" } 
     }));

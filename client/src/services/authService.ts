@@ -5,7 +5,6 @@ interface SignupData {
   email: string;
   phone: string;
   password: string;
-  confirmPassword: string;
 }
 
 export const signupUser = async (data: SignupData): Promise<any> => {

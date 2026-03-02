@@ -9,20 +9,16 @@ interface SignupFormProps {
 }
 
 const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
-  // Step Management
   const [step, setStep] = useState(1);
 
-  // Form State
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
     fullName: '',
     email: '',
     phone: '',
-    password: '',
-    confirmPassword: ''
+    password: ''
   });
   
   const [loading, setLoading] = useState(false);
@@ -67,13 +63,6 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
       }
     }
 
-    if (step === 3) {
-      if (!formData.phone || formData.phone.length < 10) {
-        setError("Please enter a valid 10-digit phone number.");
-        return;
-      }
-    }
-
     setStep((prev) => prev + 1);
   };
 
@@ -87,6 +76,14 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
     setLoading(true);
     setError(null);
 
+    // Validate Phone
+    if (!formData.phone || formData.phone.length < 10) {
+      setError("Please enter a valid 10-digit phone number.");
+      setLoading(false);
+      return;
+    }
+
+    // Validate Password
     const pass = formData.password;
     if (pass.length < 6) {
       setError("Password must be at least 6 characters long.");
@@ -113,11 +110,6 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
       setLoading(false);
       return;
     }
-    if (pass !== formData.confirmPassword) {
-      setError("Passwords do not match.");
-      setLoading(false);
-      return;
-    }
 
     try {
       setShowLoader(true);
@@ -126,22 +118,15 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
         email: formData.email,
         phone: `+91${formData.phone}`, 
         password: formData.password,
-        confirmPassword: formData.confirmPassword,
       });
 
-      console.log("Account created successfully!");
-      
       setTimeout(() => {
         setIsLogin(true);
       }, 1500);
 
     } catch (err: any) {
-      // ==========================================
-      // UPDATED ERROR INTERCEPTION LOGIC
-      // ==========================================
       const errorStatus = err?.status || err?.response?.status || err?.statusCode;
       
-      // Explicitly detect network drops by code, message, or a 0 status
       const isNetworkError = 
         errorStatus === 0 || 
         err?.code === "ERR_NETWORK" || 
@@ -150,10 +135,8 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
       const globalErrorCodes = [400, 401, 403, 404, 500];
 
       if (isNetworkError || globalErrorCodes.includes(errorStatus)) {
-        // Suppress local UI. The GlobalErrorOverlay will handle this.
         console.warn(`Global error intercepted. Local UI suppressed.`);
       } else {
-        // Only show validation errors or unknown errors locally
         setError(err?.message || err?.data?.message || "An unexpected error occurred during signup.");
       }
     } finally {
@@ -204,8 +187,9 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
             <p className="text-muted">Create an account to unlock exclusive member deals.</p>
           </div>
 
+          {/* Reduced progress indicators to 3 steps */}
           <div className="d-flex gap-2 mb-4">
-            {[1, 2, 3, 4].map((num) => (
+            {[1, 2, 3].map((num) => (
               <div 
                 key={num} 
                 className="flex-grow-1 rounded-pill"
@@ -224,7 +208,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
             </div>
           )}
 
-          <form onSubmit={step === 4 ? handleSubmit : (e) => { e.preventDefault(); handleNext(); }}>
+          <form onSubmit={step === 3 ? handleSubmit : (e) => { e.preventDefault(); handleNext(); }}>
             <div style={{ minHeight: '180px' }}>
               <AnimatePresence mode="wait">
                 
@@ -239,6 +223,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
                         style={{ border: '1.5px solid var(--prime-border)', borderRadius: '12px' }}
                         placeholder='Enter Your First Name'
                         value={formData.firstName}
+                        autoComplete='off'
                         onChange={handleChange}
                         autoFocus
                       />
@@ -252,6 +237,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
                         style={{ border: '1.5px solid var(--prime-border)', borderRadius: '12px' }}
                         placeholder='Enter Your Last Name'
                         value={formData.lastName}
+                        autoComplete='off'
                         onChange={handleChange}
                       />
                     </div>
@@ -269,6 +255,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
                         style={{ border: '1.5px solid var(--prime-border)', borderRadius: '12px' }}
                         placeholder='Enter Your Full Name'
                         value={formData.fullName}
+                        autoComplete='off'
                         onChange={handleChange}
                         autoFocus
                       />
@@ -282,12 +269,14 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
                         style={{ border: '1.5px solid var(--prime-border)', borderRadius: '12px' }}
                         placeholder='Enter Your Email Address'
                         value={formData.email}
+                        autoComplete='off'
                         onChange={handleChange}
                       />
                     </div>
                   </motion.div>
                 )}
 
+                {/* Combined Step 3: Phone and Password */}
                 {step === 3 && (
                   <motion.div key="step-3" variants={slideVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.3 }}>
                     <div className="mb-3">
@@ -316,17 +305,14 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
                           placeholder="Enter Your Phone Number"
                           value={formData.phone}
                           onChange={handleChange}
+                          autoComplete='off'
                           maxLength={10}
                           autoFocus
                         />
                       </div>
                     </div>
-                  </motion.div>
-                )}
 
-                {step === 4 && (
-                  <motion.div key="step-4" variants={slideVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.3 }}>
-                    <div className="mb-3">
+                    <div className="mb-4">
                       <label className="small fw-bold text-muted mb-2 text-uppercase" style={{ letterSpacing: '1px' }}>Password</label>
                       <div className="position-relative">
                         <input
@@ -336,8 +322,8 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
                           placeholder="Create a password"
                           style={{ border: '1.5px solid var(--prime-border)', borderRadius: '12px' }}
                           value={formData.password}
+                          autoComplete='off'
                           onChange={handleChange}
-                          autoFocus
                         />
                         <button
                           type="button"
@@ -357,33 +343,6 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
                         Must contain at least 6 characters, one uppercase, one lowercase, one number, and one special character.
                       </div>
                     </div>
-
-                    <div className="mb-4">
-                      <label className="small fw-bold text-muted mb-2 text-uppercase" style={{ letterSpacing: '1px' }}>Repeat Password</label>
-                      <div className="position-relative">
-                        <input
-                          type={showConfirmPassword ? "text" : "password"}
-                          id="confirmPassword"
-                          className="form-control form-control-lg shadow-none py-2 fs-6 pe-5"
-                          placeholder="Repeat your password"
-                          style={{ border: '1.5px solid var(--prime-border)', borderRadius: '12px' }}
-                          value={formData.confirmPassword}
-                          onChange={handleChange}
-                        />
-                        <button
-                          type="button"
-                          className="btn position-absolute top-50 end-0 translate-middle-y text-muted me-2 shadow-none"
-                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          style={{ border: 'none', background: 'transparent' }}
-                        >
-                          {showConfirmPassword ? (
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
-                          ) : (
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                          )}
-                        </button>
-                      </div>
-                    </div>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -392,8 +351,8 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
             <motion.button
               whileHover={!loading ? { scale: 1.01 } : {}}
               whileTap={!loading ? { scale: 0.98 } : {}}
-              type={step === 4 ? "submit" : "button"}
-              onClick={step < 4 ? handleNext : undefined}
+              type={step === 3 ? "submit" : "button"}
+              onClick={step < 3 ? handleNext : undefined}
               disabled={loading}
               className="btn btn-lg w-100 py-3 fw-bold text-white mb-4 mt-2"
               style={{
@@ -404,7 +363,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
                 cursor: loading ? 'not-allowed' : 'pointer'
               }}
             >
-              {step < 4 ? "Continue" : "Create Account"}
+              {step < 3 ? "Continue" : "Create Account"}
             </motion.button>
           </form>
 
