@@ -3,6 +3,8 @@ import Logo from "../../assets/Logo.png";
 import { motion, AnimatePresence } from 'framer-motion';
 import { signupUser } from '../../services/authService';
 import PrimeLoader from '../PrimeLoader';
+import { useNavigate } from "react-router-dom";
+import { setToken } from '../../utils/tokenService';
 
 interface SignupFormProps {
   setIsLogin: (isLogin: boolean) => void;
@@ -18,14 +20,14 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
     fullName: '',
     email: '',
     phone: '',
-    dateOfBirth: '', // Added new field
+    dateOfBirth: '',
     password: ''
   });
-  
+
   const [loading, setLoading] = useState(false);
   const [showLoader, setShowLoader] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
+  const navigate = useNavigate();
   const primeTextStyle = { color: 'var(--prime-deep)' };
   const primeButtonStyle = {
     background: 'var(--prime-gradient)',
@@ -71,15 +73,63 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
         setError("Please enter a valid email address.");
         return;
       }
+
+      if (formData.fullName.trim().length < 3) {
+        setError("Full name must be at least 3 characters.");
+        return;
+      }
+
+      const nameRegex = /^[A-Za-z\s]+$/;
+
+      if (!nameRegex.test(formData.fullName.trim())) {
+        setError("Name should contain only letters.");
+        return;
+      }
     }
 
     if (step === 3) {
-      if (!formData.phone || formData.phone.length < 10) {
+      const phoneRegex = /^[0-9]{10}$/;
+
+      if (!phoneRegex.test(formData.phone)) {
         setError("Please enter a valid 10-digit phone number.");
         return;
       }
+
       if (!formData.dateOfBirth) {
         setError("Please enter your date of birth.");
+        return;
+      }
+
+      const today = new Date();
+      const dob = new Date(formData.dateOfBirth);
+
+      if (dob > today) {
+        setError("Date of birth cannot be in the future.");
+        return;
+      }
+
+      let age = today.getFullYear() - dob.getFullYear();
+      const monthDiff = today.getMonth() - dob.getMonth();
+
+      if (
+        monthDiff < 0 ||
+        (monthDiff === 0 && today.getDate() < dob.getDate())
+      ) {
+        age--;
+      }
+
+      if (age < 18) {
+        setError("You must be at least 18 years old to register.");
+        return;
+      }
+
+      if (age > 100) {
+        setError("Please enter a valid date of birth.");
+        return;
+      }
+
+      if (age === 0) {
+        setError("Please enter a valid date of birth.");
         return;
       }
     }
@@ -94,10 +144,18 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (loading) return;
+
     setLoading(true);
     setError(null);
 
-    // Check if all live password requirements are met
+    const trimmedFullName = formData.fullName.trim();
+    const trimmedEmail = formData.email.trim().toLowerCase();
+    const trimmedPhone = formData.phone.trim();
+    const trimmedPassword = formData.password.trim();
+    const trimmedDOB = formData.dateOfBirth;
+
     const isPasswordValid = passwordRequirements.every(req => req.isValid);
     if (!isPasswordValid) {
       setError("Please ensure your password meets all requirements.");
@@ -107,36 +165,26 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
 
     try {
       setShowLoader(true);
-      
-      await signupUser({
-        name: formData.fullName,
-        email: formData.email,
-        phone: `+91${formData.phone}`, 
-        password: formData.password,
-        dateOfBirth: formData.dateOfBirth 
+
+      const response = await signupUser({
+        name: trimmedFullName,
+        email: trimmedEmail,
+        phone: trimmedPhone,
+        password: trimmedPassword,
+        dateOfBirth: trimmedDOB
       });
 
-      console.log("Account created successfully!");
-      
-      setTimeout(() => {
-        setIsLogin(true);
-      }, 1500);
+      setToken(response.token);
+
+      navigate("/");
 
     } catch (err: any) {
-      const errorStatus = err?.status || err?.response?.status || err?.statusCode;
-      
-      const isNetworkError = 
-        errorStatus === 0 || 
-        err?.code === "ERR_NETWORK" || 
-        (err?.message && err.message.toLowerCase().includes("network error"));
+      const message =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Something went wrong. Please try again.";
 
-      const globalErrorCodes = [400, 401, 403, 404, 500];
-
-      if (isNetworkError || globalErrorCodes.includes(errorStatus)) {
-        console.warn(`Global error intercepted. Local UI suppressed.`);
-      } else {
-        setError(err?.message || err?.data?.message || "An unexpected error occurred during signup.");
-      }
+      setError(message);
     } finally {
       setShowLoader(false);
       setLoading(false);
@@ -162,8 +210,8 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
         style={{ zIndex: 1, maxWidth: '500px', overflowX: 'hidden' }}
       >
         {step > 1 && (
-          <button 
-            type="button" 
+          <button
+            type="button"
             onClick={handleBack}
             className="btn btn-link text-muted position-absolute shadow-none text-decoration-none d-flex align-items-center"
             style={{ top: '20px', left: '20px', gap: '5px' }}
@@ -174,7 +222,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
         )}
 
         <div className="w-100 mx-auto" style={{ maxWidth: '400px', marginTop: step > 1 ? '20px' : '0' }}>
-          
+
           <div className="d-flex align-items-center mb-4">
             <img src={Logo} alt="Logo" width="40" className="me-2" />
             <span className="h3 fw-bold mb-0 brand-name-breathe text-dark">PrimeHive</span>
@@ -188,11 +236,11 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
           {/* Updated to 4 steps */}
           <div className="d-flex gap-2 mb-4">
             {[1, 2, 3, 4].map((num) => (
-              <div 
-                key={num} 
+              <div
+                key={num}
                 className="flex-grow-1 rounded-pill"
-                style={{ 
-                  height: '4px', 
+                style={{
+                  height: '4px',
                   backgroundColor: step >= num ? 'var(--prime-deep)' : 'var(--prime-border)',
                   transition: 'background-color 0.4s ease'
                 }}
@@ -209,7 +257,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
           <form onSubmit={step === 4 ? handleSubmit : (e) => { e.preventDefault(); handleNext(); }}>
             <div style={{ minHeight: '180px' }}>
               <AnimatePresence mode="wait">
-                
+
                 {step === 1 && (
                   <motion.div key="step-1" variants={slideVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.3 }}>
                     <div className="mb-3">
@@ -280,13 +328,13 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
                     <div className="mb-3">
                       <label className="small fw-bold text-muted mb-2 text-uppercase" style={{ letterSpacing: '1px' }}>Phone Number</label>
                       <div className="input-group">
-                        <span 
-                          className="input-group-text fw-bold text-muted bg-light" 
-                          style={{ 
-                            border: '1.5px solid var(--prime-border)', 
+                        <span
+                          className="input-group-text fw-bold text-muted bg-light"
+                          style={{
+                            border: '1.5px solid var(--prime-border)',
                             borderRight: 'none',
-                            borderTopLeftRadius: '12px', 
-                            borderBottomLeftRadius: '12px' 
+                            borderTopLeftRadius: '12px',
+                            borderBottomLeftRadius: '12px'
                           }}
                         >
                           +91
@@ -295,10 +343,10 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
                           type="tel"
                           id="phone"
                           className="form-control form-control-lg shadow-none py-2 fs-6"
-                          style={{ 
-                            border: '1.5px solid var(--prime-border)', 
-                            borderTopRightRadius: '12px', 
-                            borderBottomRightRadius: '12px' 
+                          style={{
+                            border: '1.5px solid var(--prime-border)',
+                            borderTopRightRadius: '12px',
+                            borderBottomRightRadius: '12px'
                           }}
                           placeholder="Enter Your Phone Number"
                           value={formData.phone}
@@ -317,7 +365,9 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
                         id="dateOfBirth"
                         className="form-control form-control-lg shadow-none py-2 fs-6 text-muted"
                         style={{ border: '1.5px solid var(--prime-border)', borderRadius: '12px' }}
+                        max={new Date().toISOString().split("T")[0]}
                         value={formData.dateOfBirth}
+                        autoComplete='off'
                         onChange={handleChange}
                       />
                     </div>
@@ -354,7 +404,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
                           )}
                         </button>
                       </div>
-                      
+
                       {/* Live Password Checker */}
                       <div className="mt-3">
                         {passwordRequirements.map((req) => (

@@ -6,6 +6,7 @@ export interface IUser extends Document {
   phone: string;
   password: string;
   role: "admin" | "user";
+  dateOfBirth?: Date;
 }
 
 const userSchema = new mongoose.Schema<IUser>(
@@ -36,6 +37,9 @@ const userSchema = new mongoose.Schema<IUser>(
       type: String,
       enum: ["admin", "user"],
       default: "user"
+    },
+    dateOfBirth: {
+      type: Date
     }
   },
   { timestamps: true }

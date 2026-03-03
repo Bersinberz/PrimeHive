@@ -14,7 +14,8 @@ import authRoutes from "./routes/authRoutes";
 // ==========================================
 
 dotenv.config({
-  path: `.env.${process.env.NODE_ENV}`
+  path: `.env.${process.env.NODE_ENV}`,
+  quiet: true
 });
 
 const app = express();
@@ -48,7 +49,6 @@ app.use(
 );
 
 app.use("/api/auth", authRoutes);
-
 // ==========================================
 // Health Route
 // ==========================================
@@ -77,18 +77,18 @@ app.use((req, res) => {
 
 const startServer = async () => {
   try {
-    console.log("==================================");
-    console.log("🚀 Starting PrimeHive Server...");
-    console.log("==================================");
-
-    // Connect MongoDB first
-    await connectDB();
+    const dbName = await connectDB();
 
     const server = app.listen(PORT, () => {
-      console.log("==================================");
-      console.log(`🖥 Server running on port ${PORT}`);
-      console.log(`🌍 Environment: ${process.env.NODE_ENV}`);
-      console.log("==================================");
+      console.log(`
+====================================================
+PrimeHive Server Started Successfully
+----------------------------------------------------
+Server Port : ${PORT}
+Environment : ${process.env.NODE_ENV}
+Database    : ${dbName}
+====================================================
+`);
     });
 
     process.on("SIGTERM", () => {
@@ -98,11 +98,14 @@ const startServer = async () => {
       });
     });
 
-  } catch (error) {
-    console.error("==================================");
-    console.error("❌ Server failed to start");
-    console.error(error);
-    console.error("==================================");
+  } catch (error: any) {
+    console.error(`
+====================================================
+❌ PrimeHive Server Failed to Start
+----------------------------------------------------
+${error.message}
+====================================================
+`);
     process.exit(1);
   }
 };
