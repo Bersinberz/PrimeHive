@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import Logo from "../../assets/Logo.png";
 import { motion } from 'framer-motion';
-import { loginUser } from '../../services/authService';
-import { setToken } from '../../utils/tokenService';
+import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from "react-router-dom";
 import PrimeLoader from '../PrimeLoader';
 
@@ -17,6 +16,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ setIsLogin }) => {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const { login } = useAuth();
   const navigate = useNavigate();
 
   const primeTextStyle = { color: 'var(--prime-deep)' };
@@ -35,9 +35,8 @@ const LoginForm: React.FC<LoginFormProps> = ({ setIsLogin }) => {
     setError(null);
 
     const trimmedEmail = email.trim().toLowerCase();
-    const trimmedPassword = password.trim();
 
-    if (!trimmedEmail || !trimmedPassword) {
+    if (!trimmedEmail || !password) {
       setError("Please enter both email and password.");
       return;
     }
@@ -48,22 +47,22 @@ const LoginForm: React.FC<LoginFormProps> = ({ setIsLogin }) => {
       return;
     }
 
-    if (trimmedPassword.length < 6) {
+    if (password.length < 6) {
       setError("Password must be at least 6 characters.");
+      return;
+    }
+
+    if (/\s/.test(password)) {
+      setError("Password must not contain spaces.");
       return;
     }
 
     try {
       setLoading(true);
 
-      const response = await loginUser({
-        email: trimmedEmail,
-        password: trimmedPassword,
-      });
+      const user = await login(trimmedEmail, password);
 
-      setToken(response.token);
-
-      if (response.user.role === "admin") {
+      if (user.role === "admin") {
         navigate("/admin/dashboard");
       } else {
         navigate("/");
@@ -143,7 +142,6 @@ const LoginForm: React.FC<LoginFormProps> = ({ setIsLogin }) => {
                   onClick={() => setShowPassword(!showPassword)}
                   style={{ border: 'none', background: 'transparent' }}
                 >
-                  {/* 🔴 Replaced Emojis with SVG Icons */}
                   {showPassword ? (
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
                   ) : (
@@ -166,7 +164,6 @@ const LoginForm: React.FC<LoginFormProps> = ({ setIsLogin }) => {
                 opacity: loading ? 0.7 : 1
               }}
             >
-              {/* 🔴 Removed "Signing In..." text */}
               Sign In
             </motion.button>
           </form>

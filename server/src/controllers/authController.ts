@@ -1,128 +1,76 @@
 import { Request, Response } from "express";
+import jwt from "jsonwebtoken";
 import User from "../models/User";
-import { generateToken } from "../utils/createToken";
+import { generateAccessToken, generateRefreshToken } from "../utils/createToken";
+import {
+  isValidEmail,
+  isValidName,
+  isValidPhone,
+  validatePassword,
+  validateDOB
+} from "../utils/validators";
+
+// ==========================================
+// Cookie Config
+// ==========================================
+
+const REFRESH_COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "strict" as const,
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  path: "/api/auth"
+};
+
+// ==========================================
+// Signup
+// ==========================================
 
 export const signup = async (req: Request, res: Response) => {
   try {
     const { name, email, phone, password, dateOfBirth } = req.body;
 
-    // Basic Validation
     if (!name || !email || !phone || !password || !dateOfBirth) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
+    if (typeof name !== "string" || !isValidName(name)) {
       return res.status(400).json({
-        message: "All fields are required"
+        message: "Full name must be at least 3 characters and contain only letters"
       });
     }
 
-    // Name validation
-    if (typeof name !== 'string' || name.trim().length < 3) {
-      return res.status(400).json({
-        message: "Full name must be at least 3 characters"
-      });
+    if (typeof email !== "string" || !isValidEmail(email)) {
+      return res.status(400).json({ message: "Please enter a valid email address" });
     }
 
-    const nameRegex = /^[A-Za-z\s]+$/;
-    if (!nameRegex.test(name.trim())) {
-      return res.status(400).json({
-        message: "Name should contain only letters and spaces"
-      });
+    if (typeof phone !== "string" || !isValidPhone(phone)) {
+      return res.status(400).json({ message: "Please enter a valid 10-digit phone number" });
     }
 
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (typeof email !== 'string' || !emailRegex.test(email)) {
-      return res.status(400).json({
-        message: "Please enter a valid email address"
-      });
+    if (typeof dateOfBirth !== "string") {
+      return res.status(400).json({ message: "Invalid date format" });
     }
 
-    // Phone validation
-    const phoneRegex = /^[0-9]{10}$/;
-    if (typeof phone !== 'string' || !phoneRegex.test(phone)) {
-      return res.status(400).json({
-        message: "Please enter a valid 10-digit phone number"
-      });
+    const dobError = validateDOB(dateOfBirth);
+    if (dobError) {
+      return res.status(400).json({ message: dobError });
     }
 
-    // Date of Birth validation
-    if (typeof dateOfBirth !== 'string') {
-      return res.status(400).json({
-        message: "Invalid date format"
-      });
+    if (typeof password !== "string") {
+      return res.status(400).json({ message: "Password must be a string" });
     }
 
-    const dob = new Date(dateOfBirth);
-    const today = new Date();
-
-    if (isNaN(dob.getTime())) {
-      return res.status(400).json({
-        message: "Invalid date of birth"
-      });
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      return res.status(400).json({ message: passwordError });
     }
 
-    if (dob > today) {
-      return res.status(400).json({
-        message: "Date of birth cannot be in the future"
-      });
-    }
-
-    let age = today.getFullYear() - dob.getFullYear();
-    const monthDiff = today.getMonth() - dob.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
-      age--;
-    }
-
-    if (age < 18) {
-      return res.status(400).json({
-        message: "You must be at least 18 years old to register"
-      });
-    }
-
-    if (age > 100) {
-      return res.status(400).json({
-        message: "Please enter a valid date of birth"
-      });
-    }
-
-    // Password validation
-    if (typeof password !== 'string') {
-      return res.status(400).json({
-        message: "Password must be a string"
-      });
-    }
-
-    if (password.length < 6) {
-      return res.status(400).json({
-        message: "Password must be at least 6 characters"
-      });
-    }
-
-    if (!/[A-Z]/.test(password)) {
-      return res.status(400).json({
-        message: "Password must contain at least one uppercase letter"
-      });
-    }
-
-    if (!/[a-z]/.test(password)) {
-      return res.status(400).json({
-        message: "Password must contain at least one lowercase letter"
-      });
-    }
-
-    if (!/[0-9]/.test(password)) {
-      return res.status(400).json({
-        message: "Password must contain at least one number"
-      });
-    }
-
-    if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
-      return res.status(400).json({
-        message: "Password must contain at least one special character"
-      });
-    }
-
-    // Check if user already exists
     const existingUser = await User.findOne({
-      $or: [{ email }, { phone }]
+      $or: [
+        { email: email.trim().toLowerCase() },
+        { phone: `+91${phone}` }
+      ]
     });
 
     if (existingUser) {
@@ -131,22 +79,25 @@ export const signup = async (req: Request, res: Response) => {
       });
     }
 
+    const dob = new Date(dateOfBirth);
+
     const newUser = await User.create({
       name: name.trim(),
       email: email.trim().toLowerCase(),
       phone: `+91${phone}`,
-      password: password,
+      password,
       dateOfBirth: dob
     });
 
-    const token = generateToken({
-      id: newUser._id.toString(),
-      role: newUser.role
-    });
+    const tokenPayload = { id: newUser._id.toString(), role: newUser.role };
+    const accessToken = generateAccessToken(tokenPayload);
+    const refreshToken = generateRefreshToken(tokenPayload);
+
+    res.cookie("refreshToken", refreshToken, REFRESH_COOKIE_OPTIONS);
 
     res.status(201).json({
       message: "Account created successfully",
-      token,
+      token: accessToken,
       user: {
         id: newUser._id,
         name: newUser.name,
@@ -154,70 +105,141 @@ export const signup = async (req: Request, res: Response) => {
         role: newUser.role
       }
     });
-
   } catch (error) {
     console.error("Signup Error:", error);
-
-    res.status(500).json({
-      message: "Internal Server Error"
-    });
+    res.status(500).json({ message: "Internal Server Error" });
   }
 };
 
+// ==========================================
+// Login
+// ==========================================
+
 export const login = async (req: Request, res: Response) => {
   try {
-    let { email, password } = req.body;
+    const { email, password } = req.body;
 
-    const trimmedEmail = email?.trim().toLowerCase();
-    const trimmedPassword = password?.trim();
-
-    if (!trimmedEmail || !trimmedPassword) {
+    if (!email || !password) {
       return res.status(400).json({
-        message: "Please enter both email and password.",
+        message: "Please enter both email and password."
       });
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(trimmedEmail)) {
+    const trimmedEmail =
+      typeof email === "string" ? email.trim().toLowerCase() : "";
+
+    if (!isValidEmail(trimmedEmail)) {
       return res.status(400).json({
-        message: "Please enter a valid email address.",
+        message: "Please enter a valid email address."
       });
     }
 
-    if (trimmedPassword.length < 6) {
+    if (typeof password !== "string" || password.length < 6) {
       return res.status(400).json({
-        message: "Password must be at least 6 characters.",
+        message: "Password must be at least 6 characters."
       });
     }
 
-    const user = await User.findOne({ email: trimmedEmail });
+    if (/\s/.test(password)) {
+      return res.status(400).json({
+        message: "Password must not contain spaces."
+      });
+    }
 
-    if (!user || user.password !== trimmedPassword) {
+    const user = await User.findOne({ email: trimmedEmail }).select(
+      "+password"
+    );
+
+    if (!user || !(await user.comparePassword(password))) {
       return res.status(401).json({
-        message: "Invalid email or password.",
+        message: "Invalid email or password."
       });
     }
 
-    const token = generateToken({
-      id: user._id.toString(),
-      role: user.role,
-    });
+    const tokenPayload = { id: user._id.toString(), role: user.role };
+    const accessToken = generateAccessToken(tokenPayload);
+    const refreshToken = generateRefreshToken(tokenPayload);
+
+    res.cookie("refreshToken", refreshToken, REFRESH_COOKIE_OPTIONS);
 
     return res.status(200).json({
       message: "Login successful",
-      token,
+      token: accessToken,
       user: {
         id: user._id,
         name: user.name,
         email: user.email,
-        role: user.role,
-      },
+        role: user.role
+      }
     });
-
   } catch (error) {
     console.error("Login Error:", error);
-    return res.status(500).json({
-      message: "Internal Server Error",
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+// ==========================================
+// Refresh Session
+// ==========================================
+
+export const refreshSession = async (req: Request, res: Response) => {
+  try {
+    const token = req.cookies?.refreshToken;
+    if (!token) {
+      return res.status(401).json({ message: "No refresh token provided." });
+    }
+
+    const secret =
+      process.env.JWT_REFRESH_SECRET || `${process.env.JWT_SECRET}_refresh`;
+
+    const decoded = jwt.verify(token, secret) as {
+      id: string;
+      role: string;
+      type: string;
+    };
+
+    if (decoded.type !== "refresh") {
+      return res.status(401).json({ message: "Invalid token type." });
+    }
+
+    const user = await User.findById(decoded.id);
+    if (!user) {
+      return res.status(401).json({ message: "User not found." });
+    }
+
+    const tokenPayload = { id: user._id.toString(), role: user.role };
+    const newAccessToken = generateAccessToken(tokenPayload);
+    const newRefreshToken = generateRefreshToken(tokenPayload);
+
+    res.cookie("refreshToken", newRefreshToken, REFRESH_COOKIE_OPTIONS);
+
+    return res.status(200).json({
+      token: newAccessToken,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    return res.status(401).json({
+      message: "Invalid or expired refresh token."
     });
   }
+};
+
+// ==========================================
+// Logout
+// ==========================================
+
+export const logout = async (_req: Request, res: Response) => {
+  res.clearCookie("refreshToken", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict" as const,
+    path: "/api/auth"
+  });
+
+  return res.status(200).json({ message: "Logged out successfully" });
 };

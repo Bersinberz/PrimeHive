@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import Logo from "../../assets/Logo.png";
 import { motion, AnimatePresence } from 'framer-motion';
-import { signupUser } from '../../services/authService';
+import { useAuth } from '../../context/AuthContext';
 import PrimeLoader from '../PrimeLoader';
 import { useNavigate } from "react-router-dom";
-import { setToken } from '../../utils/tokenService';
 
 interface SignupFormProps {
   setIsLogin: (isLogin: boolean) => void;
@@ -27,7 +26,9 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
   const [loading, setLoading] = useState(false);
   const [showLoader, setShowLoader] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { signup } = useAuth();
   const navigate = useNavigate();
+
   const primeTextStyle = { color: 'var(--prime-deep)' };
   const primeButtonStyle = {
     background: 'var(--prime-gradient)',
@@ -36,9 +37,10 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
     transition: 'all 0.3s ease'
   };
 
-  // Real-time password validation checks
+  // Real-time password validation checks (includes no-spaces rule)
   const passwordRequirements = [
     { id: 'length', text: 'At least 6 characters', isValid: formData.password.length >= 6 },
+    { id: 'noSpaces', text: 'No spaces', isValid: !/\s/.test(formData.password) && formData.password.length > 0 },
     { id: 'uppercase', text: 'One uppercase letter', isValid: /[A-Z]/.test(formData.password) },
     { id: 'lowercase', text: 'One lowercase letter', isValid: /[a-z]/.test(formData.password) },
     { id: 'number', text: 'One number', isValid: /[0-9]/.test(formData.password) },
@@ -54,22 +56,23 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
     setError(null);
 
     if (step === 1) {
-      if (!formData.firstName || !formData.lastName) {
+      if (!formData.firstName.trim() || !formData.lastName.trim()) {
         setError("Please enter your first and last name.");
         return;
       }
-      if (!formData.fullName) {
-        setFormData(prev => ({ ...prev, fullName: `${prev.firstName} ${prev.lastName}`.trim() }));
-      }
+
+      // Compute fullName immediately from first + last (#10)
+      const computedName = `${formData.firstName.trim()} ${formData.lastName.trim()}`;
+      setFormData(prev => ({ ...prev, fullName: computedName }));
     }
 
     if (step === 2) {
-      if (!formData.fullName || !formData.email) {
+      if (!formData.fullName.trim() || !formData.email.trim()) {
         setError("Please enter your full name and email address.");
         return;
       }
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(formData.email)) {
+      if (!emailRegex.test(formData.email.trim())) {
         setError("Please enter a valid email address.");
         return;
       }
@@ -153,7 +156,6 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
     const trimmedFullName = formData.fullName.trim();
     const trimmedEmail = formData.email.trim().toLowerCase();
     const trimmedPhone = formData.phone.trim();
-    const trimmedPassword = formData.password.trim();
     const trimmedDOB = formData.dateOfBirth;
 
     const isPasswordValid = passwordRequirements.every(req => req.isValid);
@@ -166,22 +168,20 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
     try {
       setShowLoader(true);
 
-      const response = await signupUser({
+      await signup({
         name: trimmedFullName,
         email: trimmedEmail,
         phone: trimmedPhone,
-        password: trimmedPassword,
+        password: formData.password,
         dateOfBirth: trimmedDOB
       });
-
-      setToken(response.token);
 
       navigate("/");
 
     } catch (err: any) {
       const message =
-        err?.response?.data?.message ||
         err?.message ||
+        err?.response?.data?.message ||
         "Something went wrong. Please try again.";
 
       setError(message);

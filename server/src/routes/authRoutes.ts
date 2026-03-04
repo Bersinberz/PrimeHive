@@ -1,9 +1,26 @@
 import express from "express";
-import { login, signup } from "../controllers/authController";
+import rateLimit from "express-rate-limit";
+import {
+    login,
+    signup,
+    refreshSession,
+    logout
+} from "../controllers/authController";
 
 const router = express.Router();
 
+// Stricter rate limit specifically for login (#23)
+const loginLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 minute
+    max: 5,
+    message: {
+        message: "Too many login attempts. Please try again after a minute."
+    }
+});
+
 router.post("/signup", signup);
-router.post("/login", login)
+router.post("/login", loginLimiter, login);
+router.post("/refresh", refreshSession);
+router.post("/logout", logout);
 
 export default router;

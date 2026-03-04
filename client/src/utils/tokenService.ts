@@ -1,50 +1,70 @@
-const TOKEN_KEY = "auth_token";
+/**
+ * In-memory token storage — NOT localStorage (XSS-safe).
+ * Refresh tokens are in httpOnly cookies, managed by the server.
+ */
+
+interface TokenPayload {
+  id: string;
+  role: string;
+  iat: number;
+  exp: number;
+}
+
+let accessToken: string | null = null;
 
 /**
- * Store Token
+ * Store access token in memory
  */
-export const setToken = (token: string): void => {
-  localStorage.setItem(TOKEN_KEY, token);
+export const setAccessToken = (token: string): void => {
+  accessToken = token;
 };
 
 /**
- * Get Token
+ * Get access token from memory
  */
-export const getToken = (): string | null => {
-  return localStorage.getItem(TOKEN_KEY);
+export const getAccessToken = (): string | null => {
+  return accessToken;
 };
 
 /**
- * Remove Token (Logout)
+ * Clear access token from memory
  */
-export const removeToken = (): void => {
-  localStorage.removeItem(TOKEN_KEY);
+export const clearAccessToken = (): void => {
+  accessToken = null;
 };
 
 /**
- * Check if User is Logged In
+ * Decode the JWT payload (typed)
  */
-export const isAuthenticated = (): boolean => {
-  return !!getToken();
-};
-
-/**
- * Decode Token
- */
-export const decodeToken = (): any | null => {
-  const token = getToken();
-  if (!token) return null;
+export const decodeToken = (): TokenPayload | null => {
+  if (!accessToken) return null;
 
   try {
-    const payload = JSON.parse(atob(token.split(".")[1]));
-    return payload;
+    const payload = JSON.parse(atob(accessToken.split(".")[1]));
+    return payload as TokenPayload;
   } catch {
     return null;
   }
 };
 
 /**
- * Get User Role from Token
+ * Check if the token is expired (with 30-second buffer)
+ */
+export const isTokenExpired = (): boolean => {
+  const payload = decodeToken();
+  if (!payload) return true;
+  return Date.now() >= payload.exp * 1000 - 30000;
+};
+
+/**
+ * Check if user is authenticated (has a valid, non-expired token)
+ */
+export const isAuthenticated = (): boolean => {
+  return !!accessToken && !isTokenExpired();
+};
+
+/**
+ * Get user role from token
  */
 export const getUserRole = (): string | null => {
   const decoded = decodeToken();
@@ -52,7 +72,7 @@ export const getUserRole = (): string | null => {
 };
 
 /**
- * Get User ID from Token
+ * Get user ID from token
  */
 export const getUserId = (): string | null => {
   const decoded = decodeToken();
