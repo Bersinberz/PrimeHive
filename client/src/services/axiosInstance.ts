@@ -12,7 +12,6 @@ const axiosInstance = axios.create({
   }
 });
 
-// ✅ Attach access token automatically
 axiosInstance.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const token = getAccessToken();
@@ -26,7 +25,6 @@ axiosInstance.interceptors.request.use(
   (error: AxiosError) => Promise.reject(error)
 );
 
-// ✅ Centralized response handling with silent refresh
 let isRefreshing = false;
 let failedQueue: Array<{
   resolve: (value: unknown) => void;
@@ -47,7 +45,6 @@ const processQueue = (error: unknown) => {
 axiosInstance.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    // 🔌 Network Error
     if (!error.response) {
       window.dispatchEvent(
         new CustomEvent("api-error", {
@@ -70,12 +67,10 @@ axiosInstance.interceptors.response.use(
       _retry?: boolean;
     };
 
-    // 🔐 401 — Skip refresh for auth endpoints (#13)
     const isAuthEndpoint = originalRequest.url?.includes("/auth/");
 
     if (status === 401 && !isAuthEndpoint && !originalRequest._retry) {
       if (isRefreshing) {
-        // Queue requests while refreshing
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
         }).then(() => {
@@ -109,7 +104,6 @@ axiosInstance.interceptors.response.use(
       }
     }
 
-    // 🚨 Only trigger global overlay for serious errors
     if ([403, 404, 500].includes(status)) {
       window.dispatchEvent(
         new CustomEvent("api-error", {
@@ -118,7 +112,6 @@ axiosInstance.interceptors.response.use(
       );
     }
 
-    // ❌ All errors — handled locally in forms for 400/401
     return Promise.reject({
       status,
       message

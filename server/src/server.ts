@@ -1,5 +1,11 @@
-import express, { Request, Response, NextFunction } from "express";
 import dotenv from "dotenv";
+dotenv.config({
+  path:
+    process.env.NODE_ENV === "production"
+      ? ".env.production"
+      : ".env.development"
+});
+import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
@@ -9,15 +15,11 @@ import cookieParser from "cookie-parser";
 
 import { connectDB } from "./config/db";
 import authRoutes from "./routes/authRoutes";
+import adminProductRoutes from "./routes/Admin/adminProductRoutes";
 
 // ==========================================
 // Load Environment Variables
 // ==========================================
-
-dotenv.config({
-  path: `.env.${process.env.NODE_ENV}`
-});
-
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -78,6 +80,7 @@ app.use(
 // ==========================================
 
 app.use("/api/auth", authRoutes);
+app.use("/api/admin/products", adminProductRoutes);
 
 // ==========================================
 // Health Route
