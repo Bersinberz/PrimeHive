@@ -8,6 +8,7 @@ import {
 } from "../../controllers/Admin/adminProductController";
 import { adminOnly, verifyToken } from "../../middleware/verifyToken";
 import { upload } from "../../middleware/upload";
+import { validateProduct } from "../../utils/productValidators";
 
 
 const router = express.Router();
@@ -20,6 +21,7 @@ router.post(
   verifyToken,
   adminOnly,
   upload.array("images", 5),
+  validateProduct("create"),
   createProduct
 );
 
@@ -51,6 +53,7 @@ router.put(
   verifyToken,
   adminOnly,
   upload.array("images", 5),
+  validateProduct("update"),
   updateProduct
 );
 

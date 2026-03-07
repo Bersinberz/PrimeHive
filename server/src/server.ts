@@ -16,6 +16,7 @@ import cookieParser from "cookie-parser";
 import { connectDB } from "./config/db";
 import authRoutes from "./routes/authRoutes";
 import adminProductRoutes from "./routes/Admin/adminProductRoutes";
+import adminCategoryRoutes from "./routes/Admin/adminCategoryRoutes";
 
 // ==========================================
 // Load Environment Variables
@@ -81,6 +82,7 @@ app.use(
 
 app.use("/api/auth", authRoutes);
 app.use("/api/admin/products", adminProductRoutes);
+app.use("/api/admin/categories", adminCategoryRoutes);
 
 // ==========================================
 // Health Route

@@ -9,9 +9,8 @@ import {
 
 const router = express.Router();
 
-// Stricter rate limit specifically for login (#23)
 const loginLimiter = rateLimit({
-    windowMs: 1 * 60 * 1000, // 1 minute
+    windowMs: 1 * 60 * 1000,
     max: 5,
     message: {
         message: "Too many login attempts. Please try again after a minute."

@@ -8,7 +8,7 @@ import {
   isValidPhone,
   validatePassword,
   validateDOB
-} from "../utils/validators";
+} from "../utils/loginValidators";
 
 // ==========================================
 // Cookie Config

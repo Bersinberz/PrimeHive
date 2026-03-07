@@ -1,5 +1,36 @@
 import { Request, Response } from "express";
 import Product from "../../models/Product";
+import Category from "../../models/Category";
+import cloudinary from "../../config/cloudinary";
+
+/**
+ * Extract the Cloudinary public_id from a full image URL.
+ * e.g. "https://res.cloudinary.com/.../upload/v123/primehive-products/1234-img.jpg"
+ *   -> "primehive-products/1234-img"
+ */
+const extractPublicId = (url: string): string | null => {
+    try {
+        const parts = url.split("/upload/");
+        if (parts.length < 2) return null;
+        // Remove the version prefix (v123456/) and file extension
+        const afterUpload = parts[1].replace(/^v\d+\//, "");
+        return afterUpload.replace(/\.[^.]+$/, "");
+    } catch {
+        return null;
+    }
+};
+
+/**
+ * Delete an array of images from Cloudinary (best-effort, non-blocking).
+ */
+const deleteCloudinaryImages = async (imageUrls: string[]) => {
+    const deletions = imageUrls.map((url) => {
+        const publicId = extractPublicId(url);
+        if (publicId) return cloudinary.uploader.destroy(publicId);
+        return Promise.resolve();
+    });
+    await Promise.allSettled(deletions);
+};
 
 /**
  * Create Product
@@ -24,6 +55,14 @@ export const createProduct = async (req: Request, res: Response) => {
             stock,
             images: imageUrls,
         });
+
+        // Sync: add product to the Category's products array
+        if (category) {
+            await Category.findOneAndUpdate(
+                { name: category },
+                { $addToSet: { products: product._id } }
+            );
+        }
 
         res.status(201).json(product);
     } catch (error: any) {
@@ -100,24 +139,43 @@ export const updateProduct = async (req: Request, res: Response) => {
             stock,
         };
 
+        // Fetch the existing product to check for category/image changes
+        const existingProduct = await Product.findById(req.params.id);
+        if (!existingProduct) {
+            return res.status(404).json({ message: "Product not found" });
+        }
+
         // Only update images if new ones uploaded
         if (imageUrls.length > 0) {
+            if (existingProduct.images?.length) {
+                await deleteCloudinaryImages(existingProduct.images);
+            }
             updateData.images = imageUrls;
         }
 
         const product = await Product.findByIdAndUpdate(
             req.params.id,
             updateData,
-            {
-                new: true,
-                runValidators: true,
-            }
+            { new: true, runValidators: true }
         );
 
-        if (!product) {
-            return res.status(404).json({
-                message: "Product not found",
-            });
+        // Sync: if category changed, update both Category documents
+        const oldCategory = existingProduct.category;
+        if (oldCategory !== category) {
+            // Remove from old category
+            if (oldCategory) {
+                await Category.findOneAndUpdate(
+                    { name: oldCategory },
+                    { $pull: { products: existingProduct._id } }
+                );
+            }
+            // Add to new category
+            if (category) {
+                await Category.findOneAndUpdate(
+                    { name: category },
+                    { $addToSet: { products: existingProduct._id } }
+                );
+            }
         }
 
         res.status(200).json(product);
@@ -142,6 +200,18 @@ export const deleteProduct = async (req: Request, res: Response) => {
             return res.status(404).json({
                 message: "Product not found",
             });
+        }
+
+        if (product.images?.length) {
+            await deleteCloudinaryImages(product.images);
+        }
+
+        // Sync: remove product from its category's products array
+        if (product.category) {
+            await Category.findOneAndUpdate(
+                { name: product.category },
+                { $pull: { products: product._id } }
+            );
         }
 
         res.status(200).json({

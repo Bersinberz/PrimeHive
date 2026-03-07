@@ -82,7 +82,6 @@ const LoginForm: React.FC<LoginFormProps> = ({ setIsLogin }) => {
 
   return (
     <>
-      {/* 🔴 PrimeLoader added here */}
       <PrimeLoader isLoading={loading} />
 
       <motion.div
@@ -105,7 +104,6 @@ const LoginForm: React.FC<LoginFormProps> = ({ setIsLogin }) => {
             <p className="text-muted">Sign in to track orders and manage your account.</p>
           </div>
 
-          {/* 🔴 Error Display */}
           {error && (
             <div className="text-danger small fw-bold mb-3 text-center">
               {error}

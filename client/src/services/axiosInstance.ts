@@ -5,11 +5,8 @@ const baseURL = import.meta.env.VITE_API_BASE_URL;
 
 const axiosInstance = axios.create({
   baseURL,
-  timeout: 10000,
+  timeout: 30000,
   withCredentials: true,
-  headers: {
-    "Content-Type": "application/json"
-  }
 });
 
 axiosInstance.interceptors.request.use(
@@ -114,7 +111,8 @@ axiosInstance.interceptors.response.use(
 
     return Promise.reject({
       status,
-      message
+      message,
+      errors: (data as any)?.errors,
     });
   }
 );
