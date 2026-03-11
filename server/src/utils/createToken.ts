@@ -22,10 +22,11 @@ export const generateAccessToken = (payload: TokenPayload): string => {
  * Long-lived refresh token (7 days), stored in httpOnly cookie
  */
 export const generateRefreshToken = (payload: TokenPayload): string => {
-  const secret =
-    process.env.JWT_REFRESH_SECRET || `${process.env.JWT_SECRET}_refresh`;
+  if (!process.env.JWT_REFRESH_SECRET) {
+    throw new Error("JWT_REFRESH_SECRET not defined");
+  }
 
-  return jwt.sign({ ...payload, type: "refresh" }, secret, {
+  return jwt.sign({ ...payload, type: "refresh" }, process.env.JWT_REFRESH_SECRET, {
     expiresIn: "7d"
   });
 };

@@ -1,19 +1,12 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 
-interface AuthRequest extends Request {
-  user?: {
-    id: string;
-    role: string;
-  };
-}
-
 /**
  * Protect Middleware
  * Verifies JWT and attaches user to request
  */
 export const verifyToken = (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ) => {
@@ -50,10 +43,10 @@ export const verifyToken = (
 };
 
 /**
- * Admin Only Middleware
+ * Admin Only Middleware (superadmin + staff)
  */
 export const adminOnly = (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ) => {
@@ -63,7 +56,7 @@ export const adminOnly = (
     });
   }
 
-  if (req.user.role !== "admin") {
+  if (req.user.role !== "superadmin" && req.user.role !== "staff") {
     return res.status(403).json({
       message: "Admin access required"
     });
@@ -71,3 +64,26 @@ export const adminOnly = (
 
   next();
 };
+
+/**
+ * Super Admin Only Middleware (superadmin exclusive)
+ */
+export const superAdminOnly = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  if (!req.user) {
+    return res.status(401).json({
+      message: "Not authorized"
+    });
+  }
+
+  if (req.user.role !== "superadmin") {
+    return res.status(403).json({
+      message: "Super admin access required"
+    });
+  }
+
+  next();
+};

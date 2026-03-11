@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Logo from "../../assets/Logo.png";
+import { useSettings } from '../../context/SettingsContext';
 
 // --- MOCK DATA ---
 // In a real app, this would come from your API/Backend.
@@ -19,6 +20,7 @@ const HomePage: React.FC = () => {
   // --- STATE ---
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState("newest");
+  const { storeName } = useSettings();
 
   // Reusable Styles
   const primeButtonStyle = {
@@ -64,8 +66,8 @@ const HomePage: React.FC = () => {
       <nav className="navbar navbar-expand-lg bg-white shadow-sm sticky-top py-3" style={{ borderBottom: '1px solid var(--prime-border)' }}>
         <div className="container">
           <a className="navbar-brand d-flex align-items-center" href="#">
-            <img src={Logo} alt="PrimeHive Logo" width="35" className="me-2" />
-            <span className="h4 fw-bold mb-0" style={{ letterSpacing: '-0.5px' }}>PrimeHive</span>
+            <img src={Logo} alt={`${storeName} Logo`} width="35" className="me-2" />
+            <span className="h4 fw-bold mb-0" style={{ letterSpacing: '-0.5px' }}>{storeName}</span>
           </a>
           
           <div className="d-flex align-items-center gap-3">

@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from "react-router-dom";
 import PrimeLoader from '../PrimeLoader';
+import { useSettings } from '../../context/SettingsContext';
 
 interface LoginFormProps {
   setIsLogin: (isLogin: boolean) => void;
@@ -18,6 +19,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ setIsLogin }) => {
 
   const { login } = useAuth();
   const navigate = useNavigate();
+  const { storeName } = useSettings();
 
   const primeTextStyle = { color: 'var(--prime-deep)' };
   const primeButtonStyle = {
@@ -62,7 +64,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ setIsLogin }) => {
 
       const user = await login(trimmedEmail, password);
 
-      if (user.role === "admin") {
+      if (user.role === "superadmin") {
         navigate("/admin/dashboard");
       } else {
         navigate("/");
@@ -96,7 +98,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ setIsLogin }) => {
         <div className="w-100 mx-auto" style={{ maxWidth: '400px' }}>
           <div className="d-flex align-items-center mb-5">
             <img src={Logo} alt="Logo" width="40" className="me-2" />
-            <span className="h3 fw-bold mb-0 brand-name-breathe text-dark">PrimeHive</span>
+            <span className="h3 fw-bold mb-0 brand-name-breathe text-dark">{storeName}</span>
           </div>
 
           <div className="mb-5">

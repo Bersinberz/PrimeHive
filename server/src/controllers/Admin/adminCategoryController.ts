@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import Category from "../../models/Category";
 import Product from "../../models/Product";
 import mongoose from "mongoose";
+import { escapeRegex } from "../../utils/escapeRegex";
 
 /**
  * Create Category
@@ -19,7 +20,7 @@ export const createCategory = async (req: Request, res: Response) => {
 
         // Check for duplicate name
         const existing = await Category.findOne({
-            name: { $regex: new RegExp(`^${name.trim()}$`, "i") },
+            name: { $regex: new RegExp(`^${escapeRegex(name.trim())}$`, "i") },
         });
 
         if (existing) {
@@ -46,16 +47,31 @@ export const createCategory = async (req: Request, res: Response) => {
 };
 
 /**
- * Get All Categories (with product count)
+ * Get All Categories (with product count — paginated with search)
  */
 export const getCategories = async (req: Request, res: Response) => {
     try {
-        const categories = await Category.find()
-            .sort({ createdAt: -1 })
-            .select("name description products createdAt");
+        const page = Math.max(1, parseInt(req.query.page as string) || 1);
+        const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 50));
+        const search = (req.query.search as string || "").trim();
+        const skip = (page - 1) * limit;
+
+        const filter: any = {};
+        if (search) {
+            filter.name = { $regex: search, $options: "i" };
+        }
+
+        const [categories, total] = await Promise.all([
+            Category.find(filter)
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit)
+                .select("name description products createdAt"),
+            Category.countDocuments(filter),
+        ]);
 
         // Return categories with productCount
-        const result = categories.map((cat) => ({
+        const data = categories.map((cat) => ({
             _id: cat._id,
             name: cat.name,
             description: cat.description,
@@ -63,7 +79,15 @@ export const getCategories = async (req: Request, res: Response) => {
             createdAt: cat.createdAt,
         }));
 
-        res.status(200).json(result);
+        res.status(200).json({
+            data,
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit),
+            },
+        });
     } catch (error: any) {
         res.status(500).json({
             message:
@@ -225,7 +249,7 @@ export const updateCategory = async (req: Request, res: Response) => {
 
         // Check for duplicate name (excluding the current category)
         const existing = await Category.findOne({
-            name: { $regex: new RegExp(`^${name.trim()}$`, "i") },
+            name: { $regex: new RegExp(`^${escapeRegex(name.trim())}$`, "i") },
             // 2. Convert the string to a Mongoose ObjectId
             _id: { $ne: new mongoose.Types.ObjectId(categoryId) } 
         });
@@ -237,6 +261,14 @@ export const updateCategory = async (req: Request, res: Response) => {
             });
         }
 
+        // Get the current category to detect name changes
+        const currentCategory = await Category.findById(categoryId);
+        if (!currentCategory) {
+            return res.status(404).json({ message: "Category not found" });
+        }
+
+        const oldName = currentCategory.name;
+
         const category = await Category.findByIdAndUpdate(
             categoryId,
             {
@@ -246,8 +278,12 @@ export const updateCategory = async (req: Request, res: Response) => {
             { new: true, runValidators: true }
         );
 
-        if (!category) {
-            return res.status(404).json({ message: "Category not found" });
+        // Sync: if name changed, update all products that reference the old name
+        if (oldName !== name.trim()) {
+            await Product.updateMany(
+                { category: oldName },
+                { $set: { category: name.trim() } }
+            );
         }
 
         res.status(200).json(category);

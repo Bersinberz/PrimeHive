@@ -10,16 +10,16 @@ import {
 } from '../../services/Admin/productService';
 
 import PrimeLoader from '../../components/PrimeLoader';
-import ToastNotification from '../../components/Admin/Products/ToastNotification';
-import DeleteConfirmModal from '../../components/Admin/Products/DeleteConfirmModal';
+import ToastNotification from '../../components/Admin/ToastNotification';
 import ProductHeader from '../../components/Admin/Products/ProductHeader';
 import ProductList from '../../components/Admin/Products/ProductList';
 import ProductForm from '../../components/Admin/Products/ProductForm';
+import DeleteConfirmModal from '../../components/Admin/DeleteConfirmModal';
 
 const pageVariants: Variants = {
-  initial: { opacity: 0, y: 20 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.4, ease: 'easeOut' } },
-  exit: { opacity: 0, y: -20, transition: { duration: 0.2 } },
+  initial: { opacity: 0, y: 24 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.45, ease: [0.4, 0, 0.2, 1] } },
+  exit: { opacity: 0, y: -16, transition: { duration: 0.25 } },
 };
 
 const ProductManagement: React.FC = () => {
@@ -27,7 +27,8 @@ const ProductManagement: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
-  
+  const [searchQuery, setSearchQuery] = useState('');
+
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; title: string; message: string } | null>(null);
@@ -81,50 +82,56 @@ const ProductManagement: React.FC = () => {
       setEditingProduct(null);
       setView('list');
     } catch (error: any) {
-      throw error; // Let ProductForm catch the validation errors
+      throw error;
     } finally {
       setIsSaving(false);
     }
   };
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mx-auto position-relative pb-5" style={{ maxWidth: '1400px', minHeight: '80vh' }}>
-      
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      style={{ maxWidth: '1400px', minHeight: '80vh', margin: '0 auto', position: 'relative', paddingBottom: '40px' }}
+    >
       <PrimeLoader isLoading={isLoading || isSaving} />
       <ToastNotification toast={toast} onClose={() => setToast(null)} />
       <DeleteConfirmModal product={productToDelete} onConfirm={confirmDelete} onCancel={() => setProductToDelete(null)} />
 
-      <ProductHeader 
-        view={view} 
-        isEditing={!!editingProduct} 
-        onAddClick={() => { setEditingProduct(null); setView('add'); }} 
-        onBackClick={() => { setEditingProduct(null); setView('list'); }} 
+      <ProductHeader
+        view={view}
+        isEditing={!!editingProduct}
+        products={products}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        onAddClick={() => { setEditingProduct(null); setView('add'); }}
+        onBackClick={() => { setEditingProduct(null); setView('list'); }}
       />
 
       <AnimatePresence mode="wait">
         {view === 'list' ? (
-          <motion.div key="list" variants={pageVariants} initial="initial" animate="animate" exit="exit" className="card border-0 shadow-sm bg-white overflow-hidden" style={{ borderRadius: '16px' }}>
-            <ProductList 
-              products={products} 
-              isLoading={isLoading} 
-              onAddFirst={() => { setEditingProduct(null); setView('add'); }} 
-              onEdit={(p) => { setEditingProduct(p); setView('add'); }} 
-              onDelete={setProductToDelete} 
+          <motion.div key="list" variants={pageVariants} initial="initial" animate="animate" exit="exit">
+            <ProductList
+              products={products}
+              isLoading={isLoading}
+              searchQuery={searchQuery}
+              onAddFirst={() => { setEditingProduct(null); setView('add'); }}
+              onEdit={(p) => { setEditingProduct(p); setView('add'); }}
+              onDelete={setProductToDelete}
             />
           </motion.div>
         ) : (
-          <motion.div key="add" variants={pageVariants} initial="initial" animate="animate" exit="exit" className="card border-0 shadow-sm bg-white overflow-hidden" style={{ borderRadius: '16px' }}>
-            <ProductForm 
-              initialData={editingProduct} 
-              isSaving={isSaving} 
-              onSave={handleSaveProduct} 
-              onCancel={() => { setEditingProduct(null); setView('list'); }} 
+          <motion.div key="add" variants={pageVariants} initial="initial" animate="animate" exit="exit">
+            <ProductForm
+              initialData={editingProduct}
+              isSaving={isSaving}
+              onSave={handleSaveProduct}
+              onCancel={() => { setEditingProduct(null); setView('list'); }}
               showToast={setToast}
             />
           </motion.div>
         )}
       </AnimatePresence>
-
     </motion.div>
   );
 };

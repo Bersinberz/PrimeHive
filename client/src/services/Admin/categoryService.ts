@@ -29,10 +29,10 @@ export const createCategory = async (
     return response.data;
 };
 
-// Get all categories
-export const getCategories = async (): Promise<Category[]> => {
-    const response = await axiosInstance.get("admin/categories/get");
-    return response.data;
+// Get all categories (paginated)
+export const getCategories = async (params?: { page?: number; limit?: number; search?: string }): Promise<Category[]> => {
+    const response = await axiosInstance.get("admin/categories/get", { params });
+    return response.data.data;
 };
 
 // Delete category

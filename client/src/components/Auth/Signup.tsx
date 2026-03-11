@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import PrimeLoader from '../PrimeLoader';
 import { useNavigate } from "react-router-dom";
+import { useSettings } from '../../context/SettingsContext';
 
 interface SignupFormProps {
   setIsLogin: (isLogin: boolean) => void;
@@ -28,6 +29,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
   const [error, setError] = useState<string | null>(null);
   const { signup } = useAuth();
   const navigate = useNavigate();
+  const { storeName } = useSettings();
 
   const primeTextStyle = { color: 'var(--prime-deep)' };
   const primeButtonStyle = {
@@ -225,7 +227,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ setIsLogin }) => {
 
           <div className="d-flex align-items-center mb-4">
             <img src={Logo} alt="Logo" width="40" className="me-2" />
-            <span className="h3 fw-bold mb-0 brand-name-breathe text-dark">PrimeHive</span>
+            <span className="h3 fw-bold mb-0 brand-name-breathe text-dark">{storeName}</span>
           </div>
 
           <div className="mb-4">

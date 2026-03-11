@@ -10,13 +10,18 @@ import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
 import rateLimit from "express-rate-limit";
-import morgan from "morgan";
 import cookieParser from "cookie-parser";
+import logger from "./config/logger";
 
 import { connectDB } from "./config/db";
 import authRoutes from "./routes/authRoutes";
 import adminProductRoutes from "./routes/Admin/adminProductRoutes";
 import adminCategoryRoutes from "./routes/Admin/adminCategoryRoutes";
+import adminSettingsRoutes from "./routes/Admin/adminSettingsRoutes";
+import adminCustomerRoutes from "./routes/Admin/adminCustomerRoutes";
+import adminStaffRoutes from "./routes/Admin/adminStaffRoutes";
+import adminOrderRoutes from "./routes/Admin/adminOrderRoutes";
+import adminStatsRoutes from "./routes/Admin/adminStatsRoutes";
 
 // ==========================================
 // Load Environment Variables
@@ -48,13 +53,22 @@ app.use(helmet());
 app.use(compression());
 app.use(cookieParser());
 
-if (process.env.NODE_ENV === "development") {
-  app.use(morgan("dev"));
-}
+// CORS — supports multiple origins via comma-separated CLIENT_URL (#23)
+const allowedOrigins = (process.env.CLIENT_URL || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
 app.use(
   cors({
-    origin: process.env.CLIENT_URL,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, curl, etc.)
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true
   })
 );
@@ -68,27 +82,49 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
   next();
 });
 
-app.use(
-  rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 100,
-    message: "Too many requests from this IP, please try again later."
-  })
-);
-
 // ==========================================
-// Routes
+// Granular Rate Limiters (#24)
 // ==========================================
 
-app.use("/api/auth", authRoutes);
-app.use("/api/admin/products", adminProductRoutes);
-app.use("/api/admin/categories", adminCategoryRoutes);
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  message: "Too many auth requests. Please try again later."
+});
+
+const adminLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 200,
+  message: "Too many requests from this IP, please try again later."
+});
+
+const statsLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 30,
+  message: "Too many dashboard requests. Please try again later."
+});
+
+import publicSettingsRoutes from "./routes/publicSettingsRoutes";
+
+// ==========================================
+// Routes (API v1) (#21)
+// ==========================================
+
+app.use("/api/v1/settings", publicSettingsRoutes);
+app.use("/api/v1/auth", authLimiter, authRoutes);
+app.use("/api/v1/admin/products", adminLimiter, adminProductRoutes);
+app.use("/api/v1/admin/categories", adminLimiter, adminCategoryRoutes);
+app.use("/api/v1/admin/settings", adminLimiter, adminSettingsRoutes);
+app.use("/api/v1/admin/customers", adminLimiter, adminCustomerRoutes);
+app.use("/api/v1/admin/staff", adminLimiter, adminStaffRoutes);
+app.use("/api/v1/admin/orders", adminLimiter, adminOrderRoutes);
+app.use("/api/v1/admin/stats", statsLimiter, adminStatsRoutes);
 
 // ==========================================
 // Health Route
 // ==========================================
 
-app.get("/api/health", (req, res) => {
+app.get("/api/v1/health", (req, res) => {
   res.status(200).json({
     status: "OK",
     environment: process.env.NODE_ENV,
@@ -111,7 +147,7 @@ app.use((req: Request, res: Response) => {
 // ==========================================
 
 app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
-  console.error("Unhandled Error:", err);
+  logger.error("Unhandled Error:", err);
   res.status(500).json({
     message:
       process.env.NODE_ENV === "production"
@@ -129,7 +165,7 @@ const startServer = async () => {
     const dbName = await connectDB();
 
     const server = app.listen(PORT, () => {
-      console.log(`
+      logger.info(`
 ====================================================
 PrimeHive Server Started Successfully
 ----------------------------------------------------
@@ -142,9 +178,9 @@ Database    : ${dbName}
 
     // Graceful shutdown for both SIGTERM and SIGINT (#15)
     const gracefulShutdown = (signal: string) => {
-      console.log(`${signal} received. Shutting down gracefully...`);
+      logger.info(`${signal} received. Shutting down gracefully...`);
       server.close(() => {
-        console.log("Server closed.");
+        logger.info("Server closed.");
         process.exit(0);
       });
     };
@@ -152,7 +188,7 @@ Database    : ${dbName}
     process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
     process.on("SIGINT", () => gracefulShutdown("SIGINT"));
   } catch (error: any) {
-    console.error(`
+    logger.error(`
 ====================================================
 ❌ PrimeHive Server Failed to Start
 ----------------------------------------------------

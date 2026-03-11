@@ -5,10 +5,14 @@ import PrimeLoader from "./PrimeLoader";
 
 interface ProtectedRouteProps {
     children: React.ReactNode;
+    allowedRoles?: string[];
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-    const { isAuthenticated, loading } = useAuth();
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
+    children,
+    allowedRoles = ["superadmin", "staff"],
+}) => {
+    const { user, isAuthenticated, loading } = useAuth();
 
     if (loading) {
         return <PrimeLoader isLoading={true} />;
@@ -16,6 +20,10 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
     if (!isAuthenticated) {
         return <Navigate to="/auth" replace />;
+    }
+
+    if (user && !allowedRoles.includes(user.role)) {
+        return <Navigate to="/" replace />;
     }
 
     return <>{children}</>;

@@ -7,7 +7,7 @@ import {
   deleteProduct,
 } from "../../controllers/Admin/adminProductController";
 import { adminOnly, verifyToken } from "../../middleware/verifyToken";
-import { upload } from "../../middleware/upload";
+import { upload, handleUploadErrors } from "../../middleware/upload";
 import { validateProduct } from "../../utils/productValidators";
 
 
@@ -21,6 +21,7 @@ router.post(
   verifyToken,
   adminOnly,
   upload.array("images", 5),
+  handleUploadErrors,
   validateProduct("create"),
   createProduct
 );
@@ -53,6 +54,7 @@ router.put(
   verifyToken,
   adminOnly,
   upload.array("images", 5),
+  handleUploadErrors,
   validateProduct("update"),
   updateProduct
 );

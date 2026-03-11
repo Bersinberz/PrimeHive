@@ -13,25 +13,26 @@ import {
 import { getProducts, type Product } from '../../services/Admin/productService';
 
 import PrimeLoader from '../../components/PrimeLoader';
-import ToastNotification from '../../components/Admin/Products/ToastNotification';
-import DeleteConfirmModal from '../../components/Admin/Products/DeleteConfirmModal';
+import ToastNotification from '../../components/Admin/ToastNotification';
 import AssignProducts from '../../components/Admin/Categories/AssignProducts';
 import CategoryForm from '../../components/Admin/Categories/CategoryForm';
 import CategoryHeader from '../../components/Admin/Categories/CategoryHeader';
 import CategoryList from '../../components/Admin/Categories/CategoryList';
+import DeleteConfirmModal from '../../components/Admin/DeleteConfirmModal';
 
 
 const CategoryManagement: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [toast, setToast] = useState<{ type: 'success' | 'error'; title: string; message: string } | null>(null);
 
   // Overlay States
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
-  
+
   // Assign Drawer States
   const [categoryToAssign, setCategoryToAssign] = useState<Category | null>(null);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
@@ -145,16 +146,16 @@ const CategoryManagement: React.FC = () => {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mx-auto position-relative pb-5" style={{ maxWidth: '1400px', minHeight: '80vh' }}>
-      
+
       {/* Globals */}
       <PrimeLoader isLoading={isLoading || isSaving} />
       <ToastNotification toast={toast} onClose={() => setToast(null)} />
       <DeleteConfirmModal product={categoryToDelete as any} onConfirm={confirmDelete} onCancel={() => setCategoryToDelete(null)} />
-      
+
       {/* 1. Add/Edit Category Modal */}
       <AnimatePresence>
         {isFormModalOpen && (
-          <CategoryForm 
+          <CategoryForm
             initialData={editingCategory}
             isSaving={isSaving}
             onSave={handleSaveCategory}
@@ -167,7 +168,7 @@ const CategoryManagement: React.FC = () => {
       {/* 2. Assign Products Right Drawer */}
       <AnimatePresence>
         {categoryToAssign && (
-          <AssignProducts 
+          <AssignProducts
             category={categoryToAssign}
             availableProducts={allProducts}
             initialAssignedIds={assignedProductIds}
@@ -179,18 +180,22 @@ const CategoryManagement: React.FC = () => {
       </AnimatePresence>
 
       {/* Base Page Content (Always visible behind modals) */}
-      <CategoryHeader onAddClick={handleOpenAddModal} />
+      <CategoryHeader
+        categories={categories}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        onAddClick={handleOpenAddModal}
+      />
 
-      <div className="card border-0 shadow-sm bg-white overflow-hidden" style={{ borderRadius: '16px' }}>
-        <CategoryList 
-          categories={categories} 
-          isLoading={isLoading} 
-          onAddFirst={handleOpenAddModal} 
-          onEdit={handleOpenEditModal} 
-          onAssign={handleOpenAssign}
-          onDelete={setCategoryToDelete} 
-        />
-      </div>
+      <CategoryList
+        categories={categories}
+        isLoading={isLoading}
+        searchQuery={searchQuery}
+        onAddFirst={handleOpenAddModal}
+        onEdit={handleOpenEditModal}
+        onAssign={handleOpenAssign}
+        onDelete={setCategoryToDelete}
+      />
 
     </motion.div>
   );

@@ -19,7 +19,7 @@ const REFRESH_COOKIE_OPTIONS = {
   secure: process.env.NODE_ENV === "production",
   sameSite: "strict" as const,
   maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-  path: "/api/auth"
+  path: "/api/v1/auth"
 };
 
 // ==========================================
@@ -189,9 +189,10 @@ export const refreshSession = async (req: Request, res: Response) => {
       return res.status(401).json({ message: "No refresh token provided." });
     }
 
-    const secret =
-      process.env.JWT_REFRESH_SECRET || `${process.env.JWT_SECRET}_refresh`;
-
+    const secret = process.env.JWT_REFRESH_SECRET;
+    if (!secret) {
+      return res.status(500).json({ message: "Server configuration error." });
+    }
     const decoded = jwt.verify(token, secret) as {
       id: string;
       role: string;
@@ -205,6 +206,19 @@ export const refreshSession = async (req: Request, res: Response) => {
     const user = await User.findById(decoded.id);
     if (!user) {
       return res.status(401).json({ message: "User not found." });
+    }
+
+    // Prevent banned/inactive users from refreshing tokens
+    if (user.status !== "active") {
+      res.clearCookie("refreshToken", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict" as const,
+        path: "/api/v1/auth"
+      });
+      return res.status(403).json({
+        message: "Account is " + user.status + ". Please contact support."
+      });
     }
 
     const tokenPayload = { id: user._id.toString(), role: user.role };
@@ -238,7 +252,7 @@ export const logout = async (_req: Request, res: Response) => {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict" as const,
-    path: "/api/auth"
+    path: "/api/v1/auth"
   });
 
   return res.status(200).json({ message: "Logged out successfully" });

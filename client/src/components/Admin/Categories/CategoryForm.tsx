@@ -64,7 +64,7 @@ const CategoryForm: React.FC<CategoryFormModalProps> = ({ initialData, isSaving,
       showToast({ type: 'error', title: 'Validation Error', message: 'Please correct the errors below.' });
       return;
     }
-    
+
     try {
       await onSave({
         name: formData.name.trim(),
@@ -96,8 +96,8 @@ const CategoryForm: React.FC<CategoryFormModalProps> = ({ initialData, isSaving,
 
       {/* Modal Content */}
       <motion.div
-        initial={{ opacity: 0, y: 50, scale: 0.95 }} 
-        animate={{ opacity: 1, y: 0, scale: 1 }} 
+        initial={{ opacity: 0, y: 50, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 20, scale: 0.95 }}
         className="position-fixed top-50 start-50 translate-middle w-100"
         style={{ maxWidth: '500px', zIndex: 1050 }}
@@ -107,41 +107,41 @@ const CategoryForm: React.FC<CategoryFormModalProps> = ({ initialData, isSaving,
             <h4 className="fw-bolder mb-0 text-dark">{initialData ? 'Edit Category' : 'Add New Category'}</h4>
             <button onClick={onClose} className="btn-close shadow-none" disabled={isSaving}></button>
           </div>
-          
+
           <form onSubmit={handleFormSubmit}>
             <div className="mb-4">
               <label className="form-label fw-bold text-dark small text-uppercase tracking-wider">Category Name *</label>
               <input
-                type="text" 
+                type="text"
                 name="name"
                 className={fieldClass('name')}
-                placeholder="e.g. Smart Watches" 
-                value={formData.name} 
+                placeholder="e.g. Smart Watches"
+                value={formData.name}
                 onChange={handleInputChange}
-                style={{ borderRadius: '10px' }} 
-                autoFocus 
+                style={{ borderRadius: '10px' }}
+                autoFocus
               />
               {formErrors.name && <small className="text-danger mt-1 d-block">{formErrors.name}</small>}
             </div>
-            
+
             <div className="mb-4">
               <label className="form-label fw-bold text-dark small text-uppercase tracking-wider">Description</label>
               <textarea
                 name="description"
-                className={fieldClass('description')} 
+                className={fieldClass('description')}
                 rows={4}
-                placeholder="Briefly describe this category..." 
-                value={formData.description} 
+                placeholder="Briefly describe this category..."
+                value={formData.description}
                 onChange={handleInputChange}
                 style={{ borderRadius: '10px', resize: 'none' }}
               />
               {formErrors.description && <small className="text-danger mt-1 d-block">{formErrors.description}</small>}
             </div>
-            
-            <button 
-              type="submit" 
-              className="btn w-100 py-3 fw-bold text-white text-uppercase tracking-wider transition-all" 
-              disabled={isSaving} 
+
+            <button
+              type="submit"
+              className="btn w-100 py-3 fw-bold text-white text-uppercase tracking-wider transition-all"
+              disabled={isSaving}
               style={{ background: 'var(--prime-gradient)', boxShadow: 'var(--prime-shadow)', borderRadius: '12px', letterSpacing: '1px' }}
             >
               {isSaving ? <><span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Saving...</> : initialData ? 'Update Category' : 'Save Category'}

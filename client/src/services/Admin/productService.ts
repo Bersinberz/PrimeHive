@@ -22,7 +22,18 @@ export interface Product {
   category: string;
   sku: string;
   stock: number;
+  status: "active" | "draft" | "archived";
   images: string[];
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
 }
 
 // Create product
@@ -55,9 +66,9 @@ export const createProduct = async (
   return response.data;
 };
 
-export const getProducts = async (): Promise<Product[]> => {
-  const response = await axiosInstance.get("admin/products/get");
-  return response.data;
+export const getProducts = async (params?: { page?: number; limit?: number; search?: string }): Promise<Product[]> => {
+  const response = await axiosInstance.get("admin/products/get", { params });
+  return response.data.data;
 };
 
 export const getProductById = async (id: string): Promise<Product> => {

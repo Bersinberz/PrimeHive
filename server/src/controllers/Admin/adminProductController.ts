@@ -37,7 +37,7 @@ const deleteCloudinaryImages = async (imageUrls: string[]) => {
  */
 export const createProduct = async (req: Request, res: Response) => {
     try {
-        const { name, description, price, comparePrice, category, sku, stock } =
+        const { name, description, price, comparePrice, category, sku, stock, status } =
             req.body;
 
         const files = req.files as Express.Multer.File[];
@@ -53,6 +53,7 @@ export const createProduct = async (req: Request, res: Response) => {
             category,
             sku,
             stock,
+            status: status || "active",
             images: imageUrls,
         });
 
@@ -76,13 +77,37 @@ export const createProduct = async (req: Request, res: Response) => {
 };
 
 /**
- * Get All Products
+ * Get All Products (with pagination and search)
  */
 export const getProducts = async (req: Request, res: Response) => {
     try {
-        const products = await Product.find().sort({ createdAt: -1 });
+        const page = Math.max(1, parseInt(req.query.page as string) || 1);
+        const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 50));
+        const search = (req.query.search as string || "").trim();
+        const skip = (page - 1) * limit;
 
-        res.status(200).json(products);
+        const filter: any = {};
+        if (search) {
+            filter.$or = [
+                { name: { $regex: search, $options: "i" } },
+                { sku: { $regex: search, $options: "i" } },
+            ];
+        }
+
+        const [products, total] = await Promise.all([
+            Product.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+            Product.countDocuments(filter),
+        ]);
+
+        res.status(200).json({
+            data: products,
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit),
+            },
+        });
     } catch (error: any) {
         res.status(500).json({
             message:
@@ -122,7 +147,7 @@ export const getProductById = async (req: Request, res: Response) => {
  */
 export const updateProduct = async (req: Request, res: Response) => {
     try {
-        const { name, description, price, comparePrice, category, sku, stock } =
+        const { name, description, price, comparePrice, category, sku, stock, status } =
             req.body;
 
         const files = req.files as Express.Multer.File[];
@@ -137,6 +162,7 @@ export const updateProduct = async (req: Request, res: Response) => {
             category,
             sku,
             stock,
+            status,
         };
 
         // Fetch the existing product to check for category/image changes

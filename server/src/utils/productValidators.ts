@@ -118,6 +118,15 @@ export const validateProduct = (mode: "create" | "update") => {
             });
         }
 
+        // --- Status ---
+        const { status } = req.body;
+        if (status && !["active", "draft", "archived"].includes(status)) {
+            errors.push({
+                field: "status",
+                message: "Status must be 'active', 'draft', or 'archived'",
+            });
+        }
+
         // --- Images ---
         const files = req.files as Express.Multer.File[] | undefined;
         if (mode === "create" && (!files || files.length === 0)) {

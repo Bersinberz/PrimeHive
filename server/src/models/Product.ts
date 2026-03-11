@@ -8,6 +8,7 @@ export interface IProduct extends Document {
   category: string;
   sku: string;
   stock: number;
+  status: "active" | "draft" | "archived";
   images: string[];
   createdAt: Date;
   updatedAt: Date;
@@ -58,6 +59,12 @@ const ProductSchema = new Schema<IProduct>(
       type: Number,
       default: 0,
       min: [0, "Stock cannot be negative"],
+    },
+
+    status: {
+      type: String,
+      enum: ["active", "draft", "archived"],
+      default: "active",
     },
 
     images: {
