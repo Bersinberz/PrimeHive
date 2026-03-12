@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, type Variants } from 'framer-motion';
 import type { CreateProductPayload, Product } from '../../../services/Admin/productService';
 import { getCategories, type Category } from '../../../services/Admin/categoryService';
@@ -35,7 +35,8 @@ const ProductForm: React.FC<ProductFormProps> = ({ initialData, isSaving, onSave
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [isDragging, setIsDragging] = useState(false);
   const [images, setImages] = useState<File[]>([]);
-  const blobUrlsRef = useRef<string[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [currentPreviewIndex, setCurrentPreviewIndex] = useState(0);
   const [categories, setCategories] = useState<Category[]>([]);
 
   useEffect(() => {
@@ -52,12 +53,26 @@ const ProductForm: React.FC<ProductFormProps> = ({ initialData, isSaving, onSave
     stock: initialData?.stock?.toString() || '',
   });
 
+  // Safely generate and cleanup preview URLs whenever `images` state changes
   useEffect(() => {
+    const urls = images.map(file => URL.createObjectURL(file));
+    setImagePreviews(urls);
+
+    // Cleanup function to prevent memory leaks
     return () => {
-      blobUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
-      blobUrlsRef.current = [];
+      urls.forEach(url => URL.revokeObjectURL(url));
     };
   }, [images]);
+
+  // Ensure our live preview index doesn't go out of bounds if we delete an image
+  const displayImages = imagePreviews.length > 0 ? imagePreviews : (initialData?.images || []);
+  useEffect(() => {
+    if (currentPreviewIndex >= displayImages.length && displayImages.length > 0) {
+      setCurrentPreviewIndex(displayImages.length - 1);
+    } else if (displayImages.length === 0) {
+      setCurrentPreviewIndex(0);
+    }
+  }, [displayImages.length, currentPreviewIndex]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -87,10 +102,17 @@ const ProductForm: React.FC<ProductFormProps> = ({ initialData, isSaving, onSave
     setImages(prev => prev.filter((_, i) => i !== index));
   };
 
-  const createPreviewUrl = (file: File): string => {
-    const url = URL.createObjectURL(file);
-    blobUrlsRef.current.push(url);
-    return url;
+  const moveImage = (index: number, direction: 'left' | 'right') => {
+    const newIndex = direction === 'left' ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= images.length) return;
+
+    setImages(prev => {
+      const newImages = [...prev];
+      const temp = newImages[index];
+      newImages[index] = newImages[newIndex];
+      newImages[newIndex] = temp;
+      return newImages;
+    });
   };
 
   const handleFormSubmit = async () => {
@@ -232,21 +254,40 @@ const ProductForm: React.FC<ProductFormProps> = ({ initialData, isSaving, onSave
             {formErrors.images && <div className="field-error" style={{ marginTop: '8px' }}>{formErrors.images}</div>}
             <input type="file" id="image-upload" multiple accept="image/*" onChange={handleImageSelect} style={{ display: 'none' }} />
 
-            {images.length > 0 && (
-              <div className="upload-grid">
-                {images.map((file, index) => (
-                  <div key={index} className="upload-thumb">
-                    <img src={createPreviewUrl(file)} alt={`preview-${index}`} />
-                    <button
-                      type="button"
-                      className="remove-btn"
-                      onClick={e => { e.stopPropagation(); removeImage(index); }}
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                        <line x1="18" y1="6" x2="6" y2="18" />
-                        <line x1="6" y1="6" x2="18" y2="18" />
-                      </svg>
-                    </button>
+            {imagePreviews.length > 0 && (
+              <div className="upload-grid" style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '16px' }}>
+                {imagePreviews.map((url, index) => (
+                  <div key={index} className="upload-thumb" style={{ position: 'relative', width: '80px', height: '80px', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+                    <img src={url} alt={`preview-${index}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+
+                    {/* Reorder and Delete Controls */}
+                    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'space-between', padding: '4px', backdropFilter: 'blur(2px)' }}>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); moveImage(index, 'left'); }}
+                        disabled={index === 0}
+                        style={{ background: 'none', border: 'none', color: index === 0 ? '#666' : '#fff', cursor: index === 0 ? 'default' : 'pointer', padding: 0 }}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6" /></svg>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={e => { e.stopPropagation(); removeImage(index); }}
+                        style={{ background: 'none', border: 'none', color: '#ff4d4f', cursor: 'pointer', padding: 0 }}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); moveImage(index, 'right'); }}
+                        disabled={index === imagePreviews.length - 1}
+                        style={{ background: 'none', border: 'none', color: index === imagePreviews.length - 1 ? '#666' : '#fff', cursor: index === imagePreviews.length - 1 ? 'default' : 'pointer', padding: 0 }}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -356,25 +397,56 @@ const ProductForm: React.FC<ProductFormProps> = ({ initialData, isSaving, onSave
           Live Preview
         </div>
         <div className="preview-card">
-          <div className="preview-image">
-            {images.length > 0 ? (
-              <img src={createPreviewUrl(images[0])} alt="Preview" />
-            ) : initialData?.images && initialData.images.length > 0 ? (
-              <img src={initialData.images[0]} alt="Preview" />
+          <div className="preview-image" style={{ position: 'relative', display: 'flex', flexDirection: 'column' }}>
+            {displayImages.length > 0 ? (
+              <>
+                {/* Main large image */}
+                <div style={{ width: '100%', height: '240px', background: '#f8f9fa', borderRadius: '12px', overflow: 'hidden' }}>
+                  <img src={displayImages[currentPreviewIndex]} alt="Preview Main" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                </div>
+
+                {/* Thumbnail selector row (only shows if > 1 image) */}
+                {displayImages.length > 1 && (
+                  <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', marginTop: '12px', paddingBottom: '4px' }}>
+                    {displayImages.map((src, idx) => (
+                      <div
+                        key={idx}
+                        onClick={() => setCurrentPreviewIndex(idx)}
+                        style={{
+                          width: '48px',
+                          height: '48px',
+                          borderRadius: '8px',
+                          overflow: 'hidden',
+                          cursor: 'pointer',
+                          flexShrink: 0,
+                          border: currentPreviewIndex === idx ? '2px solid var(--prime-orange)' : '2px solid transparent',
+                          opacity: currentPreviewIndex === idx ? 1 : 0.6,
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <img src={src} alt={`thumb-${idx}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
             ) : (
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                <circle cx="8.5" cy="8.5" r="1.5" />
-                <polyline points="21 15 16 10 5 21" />
-              </svg>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '200px' }}>
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <polyline points="21 15 16 10 5 21" />
+                </svg>
+              </div>
             )}
+
             {formData.stock && (
               <span className={`status-badge ${previewStatusClass}`} style={{ position: 'absolute', top: '12px', left: '12px' }}>
                 {previewStatus}
               </span>
             )}
           </div>
-          <div className="preview-body">
+          <div className="preview-body" style={{ marginTop: displayImages.length > 1 ? '16px' : '0' }}>
             <div className="card-category" style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '1px', color: 'var(--prime-orange)', marginBottom: '6px' }}>
               {formData.category || 'Category'}
             </div>

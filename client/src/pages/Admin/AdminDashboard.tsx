@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { getDashboardStats, type DashboardStats } from '../../services/Admin/statsService';
 import ToastNotification from '../../components/Admin/ToastNotification';
+import PrimeLoader from '../../components/PrimeLoader';
 
 const STATUS_COLORS: Record<string, string> = {
   Pending: '#f59e0b',
@@ -28,15 +29,22 @@ const AdminDashboard: React.FC = () => {
 
   useEffect(() => {
     const fetchStats = async () => {
+      setIsLoading(true);
+
       try {
         const data = await getDashboardStats();
         setStats(data);
       } catch (error: any) {
-        setToast({ type: 'error', title: 'Load Failed', message: 'Could not load dashboard data.' });
+        setToast({
+          type: 'error',
+          title: 'Load Failed',
+          message: 'Could not load dashboard data.'
+        });
       } finally {
         setIsLoading(false);
       }
     };
+
     fetchStats();
   }, []);
 
@@ -78,6 +86,8 @@ const AdminDashboard: React.FC = () => {
       style={{ maxWidth: '1400px' }}
     >
       <ToastNotification toast={toast} onClose={() => setToast(null)} />
+
+      <PrimeLoader isLoading={isLoading} />
 
       {!isLoading && (
         <>
