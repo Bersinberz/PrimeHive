@@ -82,7 +82,7 @@ export const createProduct = async (req: Request, res: Response) => {
 export const getProducts = async (req: Request, res: Response) => {
     try {
         const page = Math.max(1, parseInt(req.query.page as string) || 1);
-        const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 50));
+        const limit = parseInt(req.query.limit as string) || 1000;
         const search = (req.query.search as string || "").trim();
         const skip = (page - 1) * limit;
 

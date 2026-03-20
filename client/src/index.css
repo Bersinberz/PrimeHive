@@ -90,9 +90,6 @@ body,
 
 /* ── Command Bar ── */
 .command-bar {
-  position: sticky;
-  top: 0;
-  z-index: 20;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   background: rgba(255, 255, 255, 0.85);
@@ -196,6 +193,7 @@ body,
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 24px;
   padding: 0;
+  align-items: stretch;
 }
 
 .product-card {

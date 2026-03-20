@@ -3,12 +3,11 @@ import { AuthProvider } from "./context/AuthContext";
 import { SettingsProvider } from "./context/SettingsContext";
 import AuthPage from "./pages/Auth";
 import HomePage from "./pages/User/Home";
-import AdminDashboard from "./pages/Admin/AdminDashboard";
+import AdminDashboard from "./pages/Admin/Dashboard";
 import ProductManagement from "./pages/Admin/ProductManagement";
 import AdminLayout from "./components/Admin/AdminLayout";
 import OrderManagement from "./pages/Admin/OrderManagement";
 import CustomerManagement from "./pages/Admin/CustomerManagement";
-import Analytics from "./pages/Admin/Analytics";
 import Settings from "./pages/Admin/Settings";
 import CategoryManagement from "./pages/Admin/CategoryManagement";
 import StaffManagement from "./pages/Admin/StaffManagement";
@@ -31,7 +30,6 @@ function App() {
             <Route path="orders" element={<OrderManagement />} />
             <Route path="customers" element={<CustomerManagement />} />
             <Route path="staff" element={<StaffManagement />} />
-            <Route path="analytics" element={<Analytics />} />
             <Route path="settings" element={<Settings />} />
           </Route>
         </Routes>

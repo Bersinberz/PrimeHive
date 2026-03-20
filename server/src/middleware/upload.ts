@@ -21,6 +21,24 @@ export const upload = multer({
     },
 });
 
+const profileStorage = new CloudinaryStorage({
+    cloudinary,
+    params: async (req: Request, file: Express.Multer.File) => {
+        return {
+            folder: "Profile Picture",
+            allowed_formats: ["jpg", "png", "jpeg", "webp"],
+            public_id: `${Date.now()}-${file.originalname}`,
+        };
+    },
+});
+
+export const uploadProfile = multer({
+    storage: profileStorage,
+    limits: {
+        fileSize: 5 * 1024 * 1024,
+    },
+});
+
 /**
  * Middleware to handle Multer/Cloudinary upload errors gracefully.
  * Place AFTER upload.array() in the route chain.

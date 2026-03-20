@@ -15,13 +15,13 @@ import logger from "./config/logger";
 
 import { connectDB } from "./config/db";
 import authRoutes from "./routes/authRoutes";
-import adminProductRoutes from "./routes/Admin/adminProductRoutes";
-import adminCategoryRoutes from "./routes/Admin/adminCategoryRoutes";
-import adminSettingsRoutes from "./routes/Admin/adminSettingsRoutes";
-import adminCustomerRoutes from "./routes/Admin/adminCustomerRoutes";
-import adminStaffRoutes from "./routes/Admin/adminStaffRoutes";
-import adminOrderRoutes from "./routes/Admin/adminOrderRoutes";
-import adminStatsRoutes from "./routes/Admin/adminStatsRoutes";
+import adminProductRoutes from "./routes/admin/productRoutes";
+import adminCategoryRoutes from "./routes/admin/categoryRoutes";
+import adminSettingsRoutes from "./routes/admin/settingsRoutes";
+import adminCustomerRoutes from "./routes/admin/customerRoutes";
+import adminStaffRoutes from "./routes/admin/staffRoutes";
+import adminOrderRoutes from "./routes/admin/orderRoutes";
+import adminStatsRoutes from "./routes/admin/statsRoutes";
 
 // ==========================================
 // Load Environment Variables

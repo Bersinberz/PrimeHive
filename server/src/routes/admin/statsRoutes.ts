@@ -1,5 +1,5 @@
 import express from "express";
-import { getDashboardStats } from "../../controllers/Admin/adminStatsController";
+import { getDashboardStats } from "../../controllers/admin/statsController";
 import { adminOnly, verifyToken } from "../../middleware/verifyToken";
 
 const router = express.Router();

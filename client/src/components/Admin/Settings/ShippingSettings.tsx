@@ -9,10 +9,12 @@ interface ShippingSettingsProps {
         taxRate: number;
         taxInclusive: boolean;
     };
+    formErrors: Record<string, string>;
     onInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    onBlur: (e: React.FocusEvent<HTMLInputElement>) => void;
 }
 
-const ShippingSettings: React.FC<ShippingSettingsProps> = ({ form, onInputChange }) => {
+const ShippingSettings: React.FC<ShippingSettingsProps> = ({ form, formErrors, onInputChange, onBlur }) => {
     return (
         <motion.div key="shipping" variants={pageVariants} initial="initial" animate="animate" exit="exit">
             <div style={{ marginBottom: '32px' }}>
@@ -37,13 +39,15 @@ const ShippingSettings: React.FC<ShippingSettingsProps> = ({ form, onInputChange
                         <input
                             type="number"
                             name="standardShippingRate"
-                            style={{ ...inputStyle, paddingLeft: '36px' }}
+                            style={{ ...inputStyle, paddingLeft: '36px', borderColor: formErrors.standardShippingRate ? '#ef4444' : '#f0f0f2' }}
                             value={form.standardShippingRate}
                             onChange={onInputChange}
+                            onFocus={focusHandlers.onFocus}
+                            onBlur={(e) => { e.currentTarget.style.boxShadow = 'none'; onBlur(e); }}
                             min={0}
-                            {...focusHandlers}
                         />
                     </div>
+                    {formErrors.standardShippingRate && <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '6px', fontWeight: 600 }}>{formErrors.standardShippingRate}</div>}
                 </div>
                 <div>
                     <label style={labelStyle}>Free Shipping Threshold</label>
@@ -60,13 +64,15 @@ const ShippingSettings: React.FC<ShippingSettingsProps> = ({ form, onInputChange
                         <input
                             type="number"
                             name="freeShippingThreshold"
-                            style={{ ...inputStyle, paddingLeft: '36px' }}
+                            style={{ ...inputStyle, paddingLeft: '36px', borderColor: formErrors.freeShippingThreshold ? '#ef4444' : '#f0f0f2' }}
                             value={form.freeShippingThreshold}
                             onChange={onInputChange}
+                            onFocus={focusHandlers.onFocus}
+                            onBlur={(e) => { e.currentTarget.style.boxShadow = 'none'; onBlur(e); }}
                             min={0}
-                            {...focusHandlers}
                         />
                     </div>
+                    {formErrors.freeShippingThreshold && <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '6px', fontWeight: 600 }}>{formErrors.freeShippingThreshold}</div>}
                     <p style={{ fontSize: '0.78rem', color: '#bbb', marginTop: '8px' }}>
                         Orders above <strong style={{ color: '#888' }}>₹{form.freeShippingThreshold}</strong> get free shipping
                     </p>
@@ -82,14 +88,16 @@ const ShippingSettings: React.FC<ShippingSettingsProps> = ({ form, onInputChange
                         <input
                             type="number"
                             name="taxRate"
-                            style={{ ...inputStyle, maxWidth: '200px' }}
+                            style={{ ...inputStyle, maxWidth: '200px', borderColor: formErrors.taxRate ? '#ef4444' : '#f0f0f2' }}
                             value={form.taxRate}
                             onChange={onInputChange}
+                            onFocus={focusHandlers.onFocus}
+                            onBlur={(e) => { e.currentTarget.style.boxShadow = 'none'; onBlur(e); }}
                             min={0}
                             max={100}
                             step={0.5}
-                            {...focusHandlers}
                         />
+                        {formErrors.taxRate && <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '6px', fontWeight: 600 }}>{formErrors.taxRate}</div>}
                         <p style={{ fontSize: '0.78rem', color: '#bbb', marginTop: '8px' }}>Applied to all products by default</p>
                     </div>
                     <div style={{ paddingTop: '28px' }}>

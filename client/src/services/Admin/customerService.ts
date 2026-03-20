@@ -6,7 +6,10 @@ export interface Customer {
     email: string;
     phone: string;
     role: string;
-    status: "active" | "inactive" | "banned";
+    status: "active" | "inactive";
+    gender?: "Male" | "Female" | "Other" | "Prefer not to say";
+    profilePicture?: string;
+    addresses?: any[];
     dateOfBirth?: string;
     createdAt: string;
     updatedAt: string;
@@ -24,7 +27,7 @@ export const getCustomerById = async (id: string): Promise<Customer> => {
 
 export const updateCustomerStatus = async (
     id: string,
-    status: "active" | "inactive" | "banned"
+    status: "active" | "inactive"
 ): Promise<Customer> => {
     const { data } = await axiosInstance.put(`/admin/customers/status/${id}`, { status });
     return data;
@@ -32,4 +35,11 @@ export const updateCustomerStatus = async (
 
 export const deleteCustomer = async (id: string): Promise<void> => {
     await axiosInstance.delete(`/admin/customers/delete/${id}`);
+};
+
+export const updateCustomer = async (id: string, payload: FormData): Promise<Customer> => {
+    const { data } = await axiosInstance.put(`/admin/customers/update/${id}`, payload, {
+        headers: { "Content-Type": "multipart/form-data" }
+    });
+    return data;
 };

@@ -3,9 +3,11 @@ import {
     getCustomers,
     getCustomerById,
     updateCustomerStatus,
+    updateCustomer,
     deleteCustomer,
-} from "../../controllers/Admin/adminCustomerController";
+} from "../../controllers/admin/customerController";
 import { adminOnly, verifyToken } from "../../middleware/verifyToken";
+import { uploadProfile, handleUploadErrors } from "../../middleware/upload";
 
 const router = express.Router();
 
@@ -28,5 +30,10 @@ router.put("/status/:id", verifyToken, adminOnly, updateCustomerStatus);
  * Delete Customer
  */
 router.delete("/delete/:id", verifyToken, adminOnly, deleteCustomer);
+
+/**
+ * Update Customer Details
+ */
+router.put("/update/:id", verifyToken, adminOnly, uploadProfile.single("profilePicture"), handleUploadErrors, updateCustomer);
 
 export default router;

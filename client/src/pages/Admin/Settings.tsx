@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { getSettings, updateSettings, changePassword } from '../../services/Admin/settingsService';
+import { getSettings, updateSettings, changePassword } from '../../services/admin/settingsService';
 import PrimeLoader from '../../components/PrimeLoader';
 import ToastNotification from '../../components/Admin/ToastNotification';
 
@@ -12,6 +12,7 @@ import SecuritySettings from '../../components/Admin/Settings/SecuritySettings';
 
 const Settings: React.FC = () => {
   const [activeSection, setActiveSection] = useState<SettingsSection>('general');
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; title: string; message: string } | null>(null);
@@ -59,23 +60,87 @@ const Settings: React.FC = () => {
     load();
   }, []);
 
+  const validateField = (name: string, value: any) => {
+    let error: string | undefined = undefined;
+    switch (name) {
+      case 'storeName':
+        if (!value || String(value).trim().length < 2) error = 'Store name must be at least 2 characters.';
+        break;
+      case 'supportEmail':
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!value || !emailRegex.test(String(value))) error = 'Please enter a valid email address.';
+        break;
+      case 'taxRate':
+        if (value === '' || isNaN(Number(value)) || Number(value) < 0 || Number(value) > 100) error = 'Tax rate must be between 0 and 100.';
+        break;
+      case 'standardShippingRate':
+        if (value === '' || isNaN(Number(value)) || Number(value) < 0) error = 'Shipping rate must be ≥ 0.';
+        break;
+      case 'freeShippingThreshold':
+        if (value === '' || isNaN(Number(value)) || Number(value) < 0) error = 'Threshold must be ≥ 0.';
+        break;
+    }
+    return error;
+  };
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    const error = validateField(name, value);
+    setFormErrors(prev => {
+      const newErrors = { ...prev };
+      if (error) newErrors[name] = error;
+      else delete newErrors[name];
+      return newErrors;
+    });
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type } = e.target;
+    let newValue: any = value;
     if (type === 'checkbox') {
-      setForm(prev => ({ ...prev, [name]: e.target.checked }));
+      newValue = e.target.checked;
     } else if (type === 'number') {
-      setForm(prev => ({ ...prev, [name]: Number(value) }));
-    } else {
-      setForm(prev => ({ ...prev, [name]: value }));
+      newValue = value === '' ? '' : Number(value);
+    }
+
+    setForm(prev => ({ ...prev, [name]: newValue }));
+    if (formErrors[name]) {
+      setFormErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[name];
+        return newErrors;
+      });
     }
   };
 
+  const validateForm = (): boolean => {
+    const errors: Record<string, string> = {};
+    const fields = ['storeName', 'supportEmail', 'taxRate', 'standardShippingRate', 'freeShippingThreshold'];
+    fields.forEach(f => {
+      const err = validateField(f, (form as any)[f]);
+      if (err) errors[f] = err;
+    });
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleSave = async () => {
+    if (!validateForm()) {
+      setToast({ type: 'error', title: 'Validation Error', message: 'Please correct the highlighted errors.' });
+      return;
+    }
     setIsSaving(true);
     try {
       await updateSettings(form);
       setToast({ type: 'success', title: 'Saved', message: 'Store settings updated successfully!' });
     } catch (err: any) {
+      if (err?.status === 400 && err?.errors) {
+        const backendErrors: Record<string, string> = {};
+        err.errors.forEach((e: { field: string; message: string }) => {
+          backendErrors[e.field] = e.message;
+        });
+        setFormErrors(backendErrors);
+      }
       setToast({ type: 'error', title: 'Save Failed', message: err?.message || 'Could not save settings.' });
     } finally {
       setIsSaving(false);
@@ -98,7 +163,15 @@ const Settings: React.FC = () => {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      style={{ maxWidth: '1400px', minHeight: '80vh', margin: '0 auto', position: 'relative', paddingBottom: '40px' }}
+      style={{
+        maxWidth: '1400px',
+        minHeight: '80vh',
+        margin: '0 auto',
+        position: 'relative',
+        paddingBottom: '40px',
+        display: 'flex',
+        flexDirection: 'column'
+      }}
     >
       <PrimeLoader isLoading={isLoading || isSaving} />
       <ToastNotification toast={toast} onClose={() => setToast(null)} />
@@ -118,10 +191,10 @@ const Settings: React.FC = () => {
         }}>
           <AnimatePresence mode="wait">
             {activeSection === 'general' && (
-              <GeneralSettings form={form} onInputChange={handleInputChange} />
+              <GeneralSettings form={form} formErrors={formErrors} onInputChange={handleInputChange} onBlur={handleBlur} />
             )}
             {activeSection === 'shipping' && (
-              <ShippingSettings form={form} onInputChange={handleInputChange} />
+              <ShippingSettings form={form} formErrors={formErrors} onInputChange={handleInputChange} onBlur={handleBlur} />
             )}
             {activeSection === 'security' && (
               <SecuritySettings isSaving={isSaving} onChangePassword={handleChangePassword} />

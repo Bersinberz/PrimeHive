@@ -3,7 +3,7 @@ import {
     getOrders,
     getOrderById,
     updateOrderStatus,
-} from "../../controllers/Admin/adminOrderController";
+} from "../../controllers/admin/orderController";
 import { adminOnly, verifyToken } from "../../middleware/verifyToken";
 
 const router = express.Router();

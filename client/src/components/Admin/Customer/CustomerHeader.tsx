@@ -1,28 +1,22 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import type { Product } from '../../../services/admin/productService';
+import type { Customer } from '../../../services/admin/customerService';
 
-interface ProductHeaderProps {
-  view: 'list' | 'add';
-  isEditing: boolean;
-  products: Product[];
+interface CustomerHeaderProps {
+  view: 'list' | 'profile' | 'edit';
+  customers: Customer[];
   searchQuery: string;
-  onSearchChange: (query: string) => void;
-  onAddClick: () => void;
+  setSearchQuery: (val: string) => void;
   onBackClick: () => void;
 }
 
-const ProductHeader: React.FC<ProductHeaderProps> = ({
-  view, isEditing, products,
-  searchQuery, onSearchChange,
-  onAddClick, onBackClick
+const CustomerHeader: React.FC<CustomerHeaderProps> = ({
+  view,
+  customers,
+  searchQuery,
+  setSearchQuery,
+  onBackClick
 }) => {
-
-  const totalProducts = products.length;
-  const inStock = products.filter(p => p.stock > 10).length;
-  const lowStock = products.filter(p => p.stock > 0 && p.stock <= 10).length;
-  const outOfStock = products.filter(p => p.stock === 0).length;
-
   if (view !== 'list') {
     return (
       <motion.div
@@ -36,13 +30,13 @@ const ProductHeader: React.FC<ProductHeaderProps> = ({
             <line x1="19" y1="12" x2="5" y2="12" />
             <polyline points="12 19 5 12 12 5" />
           </svg>
-          Back to Products
+          Back to Customers
         </button>
         <h2 style={{ fontSize: '2rem', fontWeight: 900, color: '#1a1a1a', letterSpacing: '-1px', marginTop: '16px', marginBottom: '4px' }}>
-          {isEditing ? 'Edit Product' : 'New Product'}
+          Customer Profile
         </h2>
         <p style={{ color: '#888', fontSize: '0.95rem', fontWeight: 500, margin: 0 }}>
-          {isEditing ? 'Update the details and media for this product.' : 'Fill in the details to publish a new item to your catalog.'}
+          View details and manage account status
         </p>
       </motion.div>
     );
@@ -55,26 +49,17 @@ const ProductHeader: React.FC<ProductHeaderProps> = ({
       transition={{ duration: 0.35 }}
       className="command-bar"
     >
-      {/* Top row: Title + Add Button */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
         <div>
           <h2 style={{ fontSize: '1.6rem', fontWeight: 900, color: '#1a1a1a', letterSpacing: '-0.5px', margin: 0, lineHeight: 1.2 }}>
-            Products
+            Customers
           </h2>
           <p style={{ color: '#999', fontSize: '0.85rem', fontWeight: 500, margin: '2px 0 0' }}>
-            Manage your entire product catalog
+            Manage your store's customer base and account statuses
           </p>
         </div>
-        <button className="new-product-btn" onClick={onAddClick}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          New Product
-        </button>
       </div>
 
-      {/* Bottom row: Search + Stats */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
         <div className="search-input-wrapper">
           <svg className="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -83,37 +68,33 @@ const ProductHeader: React.FC<ProductHeaderProps> = ({
           </svg>
           <input
             type="text"
-            placeholder="Search products..."
+            placeholder="Search customers..."
             value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
+            onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
 
         <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto', flexWrap: 'wrap' }}>
           <motion.div className="stat-pill" whileHover={{ scale: 1.03 }}>
             <span className="stat-dot" style={{ background: '#6366f1' }} />
-            <span className="stat-count">{totalProducts}</span>
+            <span className="stat-count">{customers.length}</span>
             Total
           </motion.div>
           <motion.div className="stat-pill" whileHover={{ scale: 1.03 }}>
             <span className="stat-dot" style={{ background: '#10b981' }} />
-            <span className="stat-count">{inStock}</span>
-            In Stock
+            <span className="stat-count">{customers.filter(c => c.status === 'active').length}</span>
+            Active
           </motion.div>
           <motion.div className="stat-pill" whileHover={{ scale: 1.03 }}>
             <span className="stat-dot" style={{ background: '#f59e0b' }} />
-            <span className="stat-count">{lowStock}</span>
-            Low
+            <span className="stat-count">{customers.filter(c => c.status === 'inactive').length}</span>
+            Inactive
           </motion.div>
-          <motion.div className="stat-pill" whileHover={{ scale: 1.03 }}>
-            <span className="stat-dot" style={{ background: '#ef4444' }} />
-            <span className="stat-count">{outOfStock}</span>
-            Out
-          </motion.div>
+
         </div>
       </div>
     </motion.div>
   );
 };
 
-export default ProductHeader;
+export default CustomerHeader;

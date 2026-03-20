@@ -6,7 +6,10 @@ export interface Staff {
     email: string;
     phone: string;
     role: string;
-    status: "active" | "inactive" | "banned";
+    status: "active" | "inactive";
+    gender?: "Male" | "Female" | "Other" | "Prefer not to say";
+    dateOfBirth?: string;
+    profilePicture?: string;
     createdAt: string;
     updatedAt: string;
 }
@@ -16,6 +19,8 @@ export interface AddStaffPayload {
     email: string;
     phone: string;
     password: string;
+    dateOfBirth?: string;
+    gender?: string;
 }
 
 export const getStaff = async (params?: { page?: number; limit?: number; search?: string }): Promise<Staff[]> => {
@@ -30,7 +35,7 @@ export const addStaff = async (payload: AddStaffPayload): Promise<Staff> => {
 
 export const updateStaffStatus = async (
     id: string,
-    status: "active" | "inactive" | "banned"
+    status: "active" | "inactive"
 ): Promise<Staff> => {
     const { data } = await axiosInstance.put(`/admin/staff/status/${id}`, { status });
     return data;
@@ -38,4 +43,11 @@ export const updateStaffStatus = async (
 
 export const deleteStaff = async (id: string): Promise<void> => {
     await axiosInstance.delete(`/admin/staff/delete/${id}`);
+};
+
+export const updateStaff = async (id: string, payload: FormData): Promise<Staff> => {
+    const { data } = await axiosInstance.put(`/admin/staff/update/${id}`, payload, {
+        headers: { "Content-Type": "multipart/form-data" }
+    });
+    return data;
 };

@@ -5,7 +5,7 @@ import {
   getProductById,
   updateProduct,
   deleteProduct,
-} from "../../controllers/Admin/adminProductController";
+} from "../../controllers/admin/productController";
 import { adminOnly, verifyToken } from "../../middleware/verifyToken";
 import { upload, handleUploadErrors } from "../../middleware/upload";
 import { validateProduct } from "../../utils/productValidators";

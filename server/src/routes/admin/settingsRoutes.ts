@@ -3,7 +3,7 @@ import {
     getSettings,
     updateSettings,
     changeAdminPassword,
-} from "../../controllers/Admin/adminSettingsController";
+} from "../../controllers/admin/settingsController";
 import { superAdminOnly, verifyToken } from "../../middleware/verifyToken";
 
 const router = express.Router();

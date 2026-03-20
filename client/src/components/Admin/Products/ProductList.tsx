@@ -1,6 +1,6 @@
-import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import type { Product } from '../../../services/Admin/productService';
+import React, { useEffect, useRef } from 'react';
+import { motion } from 'framer-motion';
+import type { Product } from '../../../services/admin/productService';
 
 interface ProductListProps {
   products: Product[];
@@ -9,37 +9,58 @@ interface ProductListProps {
   onAddFirst: () => void;
   onEdit: (product: Product) => void;
   onDelete: (product: Product) => void;
+  isFetchingMore?: boolean;
+  hasMore?: boolean;
+  onLoadMore?: () => void;
 }
 
-const cardVariants = {
-  hidden: { opacity: 0, y: 24, scale: 0.96 },
-  visible: (i: number) => ({
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: { delay: i * 0.06, duration: 0.4, ease: [0.4, 0, 0.2, 1] as [number, number, number, number] },
-  }),
-};
+const ProductList: React.FC<ProductListProps> = ({
+  products, isLoading, searchQuery, onAddFirst, onEdit, onDelete,
+  isFetchingMore = false, hasMore = false, onLoadMore
+}) => {
 
-const ProductList: React.FC<ProductListProps> = ({ products, isLoading, searchQuery, onAddFirst, onEdit, onDelete }) => {
-  if (isLoading) return null;
+  // Intersection Observer for Infinite Scroll
+  const observerTarget = useRef<HTMLDivElement>(null);
 
-  const filtered = products.filter(p =>
-    p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (p.sku && p.sku.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  useEffect(() => {
+    if (!observerTarget.current) return;
 
-  if (products.length === 0) {
+    const el = observerTarget.current;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (
+          entries[0].isIntersecting &&
+          hasMore &&
+          !isFetchingMore &&
+          !isLoading &&
+          onLoadMore
+        ) {
+          onLoadMore();
+        }
+      },
+      { rootMargin: "200px" }
+    );
+
+    observer.observe(el);
+
+    return () => observer.unobserve(el);
+  }, [hasMore, isFetchingMore, isLoading, onLoadMore]);
+
+  if (isLoading && products.length === 0) return null;
+
+  // Apply Search
+  const filtered = products.filter(p => {
+    return p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (p.sku && p.sku.toLowerCase().includes(searchQuery.toLowerCase()));
+  });
+
+  if (products.length === 0 && !isLoading) {
     return (
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.4 }}
-        className="empty-state-container"
-      >
+      <div className="empty-state-container">
         <div className="empty-state-icon">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--prime-orange)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--prime-orange, #ff8c42)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
             <line x1="3" y1="6" x2="21" y2="6" />
             <path d="M16 10a4 4 0 01-8 0" />
@@ -58,31 +79,31 @@ const ProductList: React.FC<ProductListProps> = ({ products, isLoading, searchQu
           </svg>
           Add Your First Product
         </button>
-      </motion.div>
+      </div>
     );
   }
 
-  if (filtered.length === 0) {
+  if (filtered.length === 0 && !isLoading) {
     return (
-      <div className="empty-state-container" style={{ padding: '60px 40px' }}>
-        <div className="empty-state-icon" style={{ width: '80px', height: '80px', borderRadius: '24px' }}>
+      <div className="empty-state-container" style={{ padding: '60px 40px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <div className="empty-state-icon d-flex align-items-center justify-content-center bg-light" style={{ width: '80px', height: '80px', borderRadius: '24px', marginBottom: '16px' }}>
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="11" cy="11" r="8" />
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
         </div>
         <h4 style={{ fontWeight: 800, color: '#555', marginBottom: '4px' }}>No results found</h4>
-        <p style={{ color: '#aaa', fontSize: '0.9rem' }}>
-          No products match "<strong>{searchQuery}</strong>". Try a different search.
+        <p style={{ color: '#aaa', fontSize: '0.9rem', textAlign: 'center' }}>
+          No products match your search. Try adjusting it.
         </p>
       </div>
     );
   }
 
   return (
-    <div className="product-grid">
-      <AnimatePresence>
-        {filtered.map((p, i) => {
+    <>
+      <div className="product-grid">
+        {filtered.map((p, index) => {
           const status = p.stock > 10 ? 'In Stock' : p.stock > 0 ? 'Low Stock' : 'Out of Stock';
           const statusClass = p.stock > 10 ? 'in-stock' : p.stock > 0 ? 'low-stock' : 'out-of-stock';
           const stockLevel = p.stock > 10 ? 'high' : p.stock > 0 ? 'medium' : 'low';
@@ -95,18 +116,16 @@ const ProductList: React.FC<ProductListProps> = ({ products, isLoading, searchQu
             <motion.div
               key={p._id}
               className="product-card"
-              variants={cardVariants}
-              initial="hidden"
-              animate="visible"
-              custom={i}
-              layout
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.3, delay: Math.min(index * 0.05, 0.5) }}
             >
               {/* Image */}
-              <div className="product-card-image">
+              <div className="product-card-image" style={{ position: 'relative' }}>
                 {p.images && p.images.length > 0 ? (
-                  <img src={p.images[0]} alt={p.name} />
+                  <img src={p.images[0]} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', backgroundColor: '#f8f9fa' }}>
                     <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                       <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
                       <circle cx="8.5" cy="8.5" r="1.5" />
@@ -170,8 +189,10 @@ const ProductList: React.FC<ProductListProps> = ({ products, isLoading, searchQu
             </motion.div>
           );
         })}
-      </AnimatePresence>
-    </div>
+      </div>
+
+      <div style={{ height: '20px' }} />
+    </>
   );
 };
 

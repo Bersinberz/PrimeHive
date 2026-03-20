@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, type Variants } from 'framer-motion';
-import type { CreateProductPayload, Product } from '../../../services/Admin/productService';
-import { getCategories, type Category } from '../../../services/Admin/categoryService';
+import type { CreateProductPayload, Product } from '../../../services/admin/productService';
+import { getCategories, type Category } from '../../../services/admin/categoryService';
 
 interface FormErrors {
   name?: string;
@@ -115,7 +115,73 @@ const ProductForm: React.FC<ProductFormProps> = ({ initialData, isSaving, onSave
     });
   };
 
+  const validateField = (name: keyof FormErrors, value: string | File[]) => {
+    let error: string | undefined = undefined;
+
+    switch (name) {
+      case 'name':
+        if (!value || typeof value !== 'string' || value.trim().length < 3) {
+          error = 'Product name must be at least 3 characters.';
+        }
+        break;
+      case 'price':
+        if (!value || isNaN(parseFloat(value as string)) || parseFloat(value as string) < 0) {
+          error = 'Please enter a valid price (≥ 0).';
+        }
+        break;
+      case 'comparePrice':
+        if (value && (isNaN(parseFloat(value as string)) || parseFloat(value as string) < 0)) {
+          error = 'Please enter a valid compare price.';
+        } else if (value && formData.price && parseFloat(value as string) < parseFloat(formData.price)) {
+          error = 'Compare price should be ≥ regular price.';
+        }
+        break;
+      case 'category':
+        if (!value || typeof value !== 'string' || !value.trim()) {
+          error = 'Please select a category.';
+        }
+        break;
+      case 'stock':
+        if (!value || isNaN(parseInt(value as string)) || parseInt(value as string) < 0) {
+          error = 'Stock must be a valid number (≥ 0).';
+        }
+        break;
+      case 'images':
+        if (!initialData && (!value || (value as File[]).length === 0)) {
+          error = 'At least one image is required for a new product.';
+        }
+        break;
+    }
+    return error;
+  };
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    const error = validateField(name as keyof FormErrors, value);
+    setFormErrors(prev => ({ ...prev, [name]: error }));
+  };
+
+  const validateForm = (): boolean => {
+    const errors: FormErrors = {};
+    const fieldsToValidate: (keyof typeof formData)[] = ['name', 'price', 'comparePrice', 'category', 'stock'];
+
+    fieldsToValidate.forEach(field => {
+      const error = validateField(field as keyof FormErrors, formData[field]);
+      if (error) errors[field as keyof FormErrors] = error;
+    });
+
+    const imgError = validateField('images', images);
+    if (imgError) errors.images = imgError;
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleFormSubmit = async () => {
+    if (!validateForm()) {
+      showToast({ type: 'error', title: 'Validation Error', message: 'Please correct the highlighted errors before publishing.' });
+      return;
+    }
     setFormErrors({});
     try {
       await onSave({
@@ -174,12 +240,12 @@ const ProductForm: React.FC<ProductFormProps> = ({ initialData, isSaving, onSave
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div className={`floating-input ${formErrors.name ? 'has-error' : ''}`}>
                 <label>Product Name *</label>
-                <input type="text" name="name" value={formData.name} onChange={handleInputChange} placeholder="e.g. Wireless Noise-Canceling Headphones" />
+                <input type="text" name="name" value={formData.name} onChange={handleInputChange} onBlur={handleBlur} placeholder="e.g. Wireless Noise-Canceling Headphones" />
                 {formErrors.name && <div className="field-error">{formErrors.name}</div>}
               </div>
               <div className={`floating-input ${formErrors.description ? 'has-error' : ''}`}>
                 <label>Description</label>
-                <textarea name="description" value={formData.description} onChange={handleInputChange} rows={4} placeholder="Describe the product features and benefits..." style={{ resize: 'vertical' }} />
+                <textarea name="description" value={formData.description} onChange={handleInputChange} onBlur={handleBlur} rows={4} placeholder="Describe the product features and benefits..." style={{ resize: 'vertical' }} />
                 {formErrors.description && <div className="field-error">{formErrors.description}</div>}
               </div>
             </div>
@@ -199,12 +265,12 @@ const ProductForm: React.FC<ProductFormProps> = ({ initialData, isSaving, onSave
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <div className={`floating-input ${formErrors.price ? 'has-error' : ''}`}>
                 <label>Price (₹) *</label>
-                <input type="number" name="price" value={formData.price} onChange={handleInputChange} placeholder="0.00" step="0.01" min="0" />
+                <input type="number" name="price" value={formData.price} onChange={handleInputChange} onBlur={handleBlur} placeholder="0.00" step="0.01" min="0" />
                 {formErrors.price && <div className="field-error">{formErrors.price}</div>}
               </div>
               <div className={`floating-input ${formErrors.comparePrice ? 'has-error' : ''}`}>
                 <label>Compare-at Price (₹)</label>
-                <input type="number" name="comparePrice" value={formData.comparePrice} onChange={handleInputChange} placeholder="0.00" step="0.01" min="0" />
+                <input type="number" name="comparePrice" value={formData.comparePrice} onChange={handleInputChange} onBlur={handleBlur} placeholder="0.00" step="0.01" min="0" />
                 {formErrors.comparePrice && <div className="field-error">{formErrors.comparePrice}</div>}
               </div>
             </div>
@@ -313,7 +379,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ initialData, isSaving, onSave
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div className={`floating-input ${formErrors.category ? 'has-error' : ''}`}>
                 <label>Category *</label>
-                <select name="category" value={formData.category} onChange={handleInputChange}>
+                <select name="category" value={formData.category} onChange={handleInputChange} onBlur={handleBlur}>
                   <option value="">Select a category...</option>
                   {categories.map(cat => (
                     <option key={cat._id} value={cat.name}>{cat.name}</option>
@@ -324,12 +390,12 @@ const ProductForm: React.FC<ProductFormProps> = ({ initialData, isSaving, onSave
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div className={`floating-input ${formErrors.sku ? 'has-error' : ''}`}>
                   <label>SKU</label>
-                  <input type="text" name="sku" value={formData.sku} onChange={handleInputChange} placeholder="PRD-XXX" />
+                  <input type="text" name="sku" value={formData.sku} onChange={handleInputChange} onBlur={handleBlur} placeholder="PRD-XXX" />
                   {formErrors.sku && <div className="field-error">{formErrors.sku}</div>}
                 </div>
                 <div className={`floating-input ${formErrors.stock ? 'has-error' : ''}`}>
                   <label>Stock *</label>
-                  <input type="number" name="stock" value={formData.stock} onChange={handleInputChange} placeholder="0" min="0" />
+                  <input type="number" name="stock" value={formData.stock} onChange={handleInputChange} onBlur={handleBlur} placeholder="0" min="0" />
                   {formErrors.stock && <div className="field-error">{formErrors.stock}</div>}
                 </div>
               </div>

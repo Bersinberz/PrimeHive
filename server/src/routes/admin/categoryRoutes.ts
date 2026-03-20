@@ -6,7 +6,7 @@ import {
     getCategoryProducts,
     assignProducts,
     updateCategory,
-} from "../../controllers/Admin/adminCategoryController";
+} from "../../controllers/admin/categoryController";
 import { adminOnly, verifyToken } from "../../middleware/verifyToken";
 
 const router = express.Router();

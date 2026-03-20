@@ -7,7 +7,10 @@ export interface IUser extends Document {
   phone: string;
   password: string;
   role: "superadmin" | "staff" | "user";
-  status: "active" | "inactive" | "banned" | "deleted";
+  status: "active" | "inactive" | "deleted";
+  gender?: "Male" | "Female" | "Other" | "Prefer not to say";
+  profilePicture?: string;
+  addresses?: mongoose.Types.ObjectId[];
   deletedAt?: Date;
   dateOfBirth?: Date;
   createdAt: Date;
@@ -46,9 +49,20 @@ const userSchema = new mongoose.Schema<IUser>(
     },
     status: {
       type: String,
-      enum: ["active", "inactive", "banned", "deleted"],
+      enum: ["active", "inactive", "deleted"],
       default: "active"
     },
+    gender: {
+      type: String,
+      enum: ["Male", "Female", "Other", "Prefer not to say"]
+    },
+    profilePicture: {
+      type: String
+    },
+    addresses: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Address"
+    }],
     deletedAt: { type: Date, default: null },
     dateOfBirth: {
       type: Date

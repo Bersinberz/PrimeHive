@@ -1,4 +1,4 @@
-import { Request, Response } from "express";
+    import { Request, Response } from "express";
 import Settings from "../../models/Settings";
 import User from "../../models/User";
 import { validatePassword } from "../../utils/loginValidators";
@@ -49,10 +49,12 @@ export const updateSettings = async (req: Request, res: Response) => {
         }
 
         // Basic validation
+        const errors: { field: string; message: string }[] = [];
+
         if (updateData.storeName !== undefined && typeof updateData.storeName === "string") {
             updateData.storeName = updateData.storeName.trim();
-            if (updateData.storeName.length === 0) {
-                return res.status(400).json({ message: "Store name cannot be empty." });
+            if (updateData.storeName.length < 2) {
+                errors.push({ field: "storeName", message: "Store name must be at least 2 characters." });
             }
         }
 
@@ -60,15 +62,33 @@ export const updateSettings = async (req: Request, res: Response) => {
             updateData.supportEmail = updateData.supportEmail.trim().toLowerCase();
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             if (!emailRegex.test(updateData.supportEmail)) {
-                return res.status(400).json({ message: "Invalid email address." });
+                errors.push({ field: "supportEmail", message: "Invalid email address." });
             }
         }
 
         if (updateData.taxRate !== undefined) {
             const rate = Number(updateData.taxRate);
             if (isNaN(rate) || rate < 0 || rate > 100) {
-                return res.status(400).json({ message: "Tax rate must be between 0 and 100." });
+                errors.push({ field: "taxRate", message: "Tax rate must be between 0 and 100." });
             }
+        }
+
+        if (updateData.standardShippingRate !== undefined) {
+            const rate = Number(updateData.standardShippingRate);
+            if (isNaN(rate) || rate < 0) {
+                errors.push({ field: "standardShippingRate", message: "Shipping rate must be ≥ 0." });
+            }
+        }
+
+        if (updateData.freeShippingThreshold !== undefined) {
+            const threshold = Number(updateData.freeShippingThreshold);
+            if (isNaN(threshold) || threshold < 0) {
+                errors.push({ field: "freeShippingThreshold", message: "Threshold must be ≥ 0." });
+            }
+        }
+
+        if (errors.length > 0) {
+            return res.status(400).json({ message: "Validation failed", errors });
         }
 
         const settings = await Settings.findOneAndUpdate(

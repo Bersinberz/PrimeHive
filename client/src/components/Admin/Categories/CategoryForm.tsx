@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { type Category } from '../../../services/Admin/categoryService';
+import { type Category } from '../../../services/admin/categoryService';
 
 interface CategoryFormErrors {
   name?: string;
@@ -40,19 +40,44 @@ const CategoryForm: React.FC<CategoryFormModalProps> = ({ initialData, isSaving,
     }
   };
 
+  const validateField = (name: string, value: string) => {
+    let error: string | undefined = undefined;
+
+    if (name === 'name') {
+      const trimmedName = value.trim();
+      if (!trimmedName) {
+        error = 'Category name is required';
+      } else if (trimmedName.length < 2) {
+        error = 'Name must be at least 2 characters';
+      }
+    }
+
+    if (name === 'description') {
+      if (value.trim().length > 500) {
+        error = 'Description must not exceed 500 characters';
+      }
+    }
+
+    return error;
+  };
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    const error = validateField(name, value);
+    setFormErrors((prev) => ({
+      ...prev,
+      [name]: error,
+    }));
+  };
+
   const validateForm = (): boolean => {
     const errors: CategoryFormErrors = {};
-    const trimmedName = formData.name.trim();
+    
+    const nameError = validateField('name', formData.name);
+    if (nameError) errors.name = nameError;
 
-    if (!trimmedName) {
-      errors.name = 'Category name is required';
-    } else if (trimmedName.length < 2) {
-      errors.name = 'Name must be at least 2 characters';
-    }
-
-    if (formData.description.trim().length > 500) {
-      errors.description = 'Description must not exceed 500 characters';
-    }
+    const descError = validateField('description', formData.description);
+    if (descError) errors.description = descError;
 
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -118,6 +143,7 @@ const CategoryForm: React.FC<CategoryFormModalProps> = ({ initialData, isSaving,
                 placeholder="e.g. Smart Watches"
                 value={formData.name}
                 onChange={handleInputChange}
+                onBlur={handleBlur}
                 style={{ borderRadius: '10px' }}
                 autoFocus
               />
@@ -133,6 +159,7 @@ const CategoryForm: React.FC<CategoryFormModalProps> = ({ initialData, isSaving,
                 placeholder="Briefly describe this category..."
                 value={formData.description}
                 onChange={handleInputChange}
+                onBlur={handleBlur}
                 style={{ borderRadius: '10px', resize: 'none' }}
               />
               {formErrors.description && <small className="text-danger mt-1 d-block">{formErrors.description}</small>}

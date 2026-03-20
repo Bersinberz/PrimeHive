@@ -1,5 +1,7 @@
 import { Request, Response } from "express";
 import User from "../../models/User";
+import { deleteImageFromCloudinary } from "../../utils/cloudinaryHelper";
+import { isValidEmail, isValidName, isValidPhone, validateDOB } from "../../utils/loginValidators";
 
 /**
  * Get All Customers (users with role "user" — paginated with search)
@@ -80,10 +82,10 @@ export const updateCustomerStatus = async (req: Request, res: Response) => {
     try {
         const { status } = req.body;
 
-        if (!["active", "inactive", "banned"].includes(status)) {
+        if (!["active", "inactive"].includes(status)) {
             return res
                 .status(400)
-                .json({ message: "Status must be 'active', 'inactive', or 'banned'." });
+                .json({ message: "Status must be 'active' or 'inactive'." });
         }
 
         const customer = await User.findOneAndUpdate(
@@ -91,6 +93,69 @@ export const updateCustomerStatus = async (req: Request, res: Response) => {
             { status },
             { new: true, runValidators: true }
         ).select("-__v");
+
+        if (!customer) {
+            return res.status(404).json({ message: "Customer not found." });
+        }
+
+        res.status(200).json(customer);
+    } catch (error: any) {
+        res.status(500).json({
+            message:
+                process.env.NODE_ENV === "production"
+                    ? "Internal Server Error"
+                    : error.message,
+        });
+    }
+};
+
+/**
+ * Update Customer Details
+ */
+export const updateCustomer = async (req: Request, res: Response) => {
+    try {
+        const { name, email, phone, dateOfBirth, gender } = req.body;
+        const updateData: any = { name, email, phone };
+
+        if (!name || !email || !phone) {
+            return res.status(400).json({ message: "Name, email, and phone are required." });
+        }
+        if (!isValidName(name)) {
+            return res.status(400).json({ message: "Name must be at least 3 characters and contain only letters." });
+        }
+        if (!isValidEmail(email)) {
+            return res.status(400).json({ message: "Invalid email address format." });
+        }
+        const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+        if (!isValidPhone(cleanPhone)) {
+            return res.status(400).json({ message: "Phone number must be exactly 10 digits." });
+        }
+        updateData.phone = `+91${cleanPhone}`;
+
+        if (dateOfBirth) {
+            const dobError = validateDOB(dateOfBirth);
+            if (dobError) return res.status(400).json({ message: dobError });
+            updateData.dateOfBirth = dateOfBirth;
+        }
+        if (gender) updateData.gender = gender;
+
+        let oldProfilePicture: string | undefined;
+        if (req.file) {
+            // Fetch old picture URL before overwriting
+            const existing = await User.findOne({ _id: req.params.id, role: "user" }).select("profilePicture");
+            oldProfilePicture = existing?.profilePicture;
+            updateData.profilePicture = req.file.path;
+        }
+
+        const customer = await User.findOneAndUpdate(
+            { _id: req.params.id, role: "user" },
+            updateData,
+            { new: true, runValidators: true }
+        ).select("-__v");
+
+        if (req.file && oldProfilePicture) {
+            await deleteImageFromCloudinary(oldProfilePicture);
+        }
 
         if (!customer) {
             return res.status(404).json({ message: "Customer not found." });

@@ -6,7 +6,7 @@ import {
   updateOrderStatus,
   type Order,
   type OrderStatus,
-} from '../../services/Admin/orderService';
+} from '../../services/admin/orderService';
 import PrimeLoader from '../../components/PrimeLoader';
 import ToastNotification from '../../components/Admin/ToastNotification';
 
@@ -120,7 +120,13 @@ const OrderManagement: React.FC = () => {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: "easeOut" }}
       className="mx-auto"
-      style={{ maxWidth: '1400px' }}
+      style={{
+        maxWidth: '1400px',
+        minHeight: '80vh',
+        position: 'relative',
+        display: 'flex',
+        flexDirection: 'column'
+      }}
     >
       <PrimeLoader isLoading={isLoading || isSaving} />
       <ToastNotification toast={toast} onClose={() => setToast(null)} />

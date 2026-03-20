@@ -8,10 +8,12 @@ interface GeneralSettingsProps {
         supportEmail: string;
         orderIdPrefix: string;
     };
+    formErrors: Record<string, string>;
     onInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    onBlur: (e: React.FocusEvent<HTMLInputElement>) => void;
 }
 
-const GeneralSettings: React.FC<GeneralSettingsProps> = ({ form, onInputChange }) => {
+const GeneralSettings: React.FC<GeneralSettingsProps> = ({ form, formErrors, onInputChange, onBlur }) => {
     return (
         <motion.div key="general" variants={pageVariants} initial="initial" animate="animate" exit="exit">
             <div style={{ marginBottom: '32px' }}>
@@ -26,24 +28,28 @@ const GeneralSettings: React.FC<GeneralSettingsProps> = ({ form, onInputChange }
                     <input
                         type="text"
                         name="storeName"
-                        style={inputStyle}
+                        style={{ ...inputStyle, borderColor: formErrors.storeName ? '#ef4444' : '#f0f0f2' }}
                         value={form.storeName}
                         onChange={onInputChange}
+                        onFocus={focusHandlers.onFocus}
+                        onBlur={(e) => { e.currentTarget.style.boxShadow = 'none'; onBlur(e); }}
                         placeholder="e.g. PrimeHive Electronics"
-                        {...focusHandlers}
                     />
+                    {formErrors.storeName && <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '6px', fontWeight: 600 }}>{formErrors.storeName}</div>}
                 </div>
                 <div>
                     <label style={labelStyle}>Support Email *</label>
                     <input
                         type="email"
                         name="supportEmail"
-                        style={inputStyle}
+                        style={{ ...inputStyle, borderColor: formErrors.supportEmail ? '#ef4444' : '#f0f0f2' }}
                         value={form.supportEmail}
                         onChange={onInputChange}
+                        onFocus={focusHandlers.onFocus}
+                        onBlur={(e) => { e.currentTarget.style.boxShadow = 'none'; onBlur(e); }}
                         placeholder="support@yourstore.com"
-                        {...focusHandlers}
                     />
+                    {formErrors.supportEmail && <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '6px', fontWeight: 600 }}>{formErrors.supportEmail}</div>}
                 </div>
                 <div>
                     <label style={labelStyle}>Store Currency</label>
@@ -107,12 +113,14 @@ const GeneralSettings: React.FC<GeneralSettingsProps> = ({ form, onInputChange }
                 <input
                     type="text"
                     name="orderIdPrefix"
-                    style={{ ...inputStyle, maxWidth: '280px' }}
+                    style={{ ...inputStyle, maxWidth: '280px', borderColor: formErrors.orderIdPrefix ? '#ef4444' : '#f0f0f2' }}
                     value={form.orderIdPrefix}
                     onChange={onInputChange}
+                    onFocus={focusHandlers.onFocus}
+                    onBlur={(e) => { e.currentTarget.style.boxShadow = 'none'; onBlur(e); }}
                     placeholder="ORD-"
-                    {...focusHandlers}
                 />
+                {formErrors.orderIdPrefix && <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '6px', fontWeight: 600 }}>{formErrors.orderIdPrefix}</div>}
                 <p style={{ fontSize: '0.78rem', color: '#bbb', marginTop: '8px' }}>
                     Example: <strong style={{ color: '#888' }}>{form.orderIdPrefix || 'ORD-'}1001</strong>, <strong style={{ color: '#888' }}>{form.orderIdPrefix || 'ORD-'}1002</strong>
                 </p>

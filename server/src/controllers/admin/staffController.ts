@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import User from "../../models/User";
-import { validatePassword } from "../../utils/loginValidators";
+import { validatePassword, isValidEmail, isValidName, isValidPhone, validateDOB } from "../../utils/loginValidators";
+import { deleteImageFromCloudinary } from "../../utils/cloudinaryHelper";
 
 /**
  * Get All Staff Members (paginated with search)
@@ -54,7 +55,7 @@ export const getStaff = async (req: Request, res: Response) => {
  */
 export const addStaff = async (req: Request, res: Response) => {
     try {
-        const { name, email, phone, password } = req.body;
+        const { name, email, phone, password, dateOfBirth, gender } = req.body;
 
         if (!name || !email || !phone || !password) {
             return res
@@ -62,15 +63,23 @@ export const addStaff = async (req: Request, res: Response) => {
                 .json({ message: "Name, email, phone, and password are required." });
         }
 
-        if (typeof name !== "string" || name.trim().length < 2) {
-            return res
-                .status(400)
-                .json({ message: "Name must be at least 2 characters." });
+        if (!isValidName(name)) {
+            return res.status(400).json({ message: "Name must be at least 3 characters and contain only letters." });
         }
 
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email.trim())) {
-            return res.status(400).json({ message: "Invalid email address." });
+        if (!isValidEmail(email)) {
+            return res.status(400).json({ message: "Invalid email address format." });
+        }
+
+        const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+        if (!isValidPhone(cleanPhone)) {
+            return res.status(400).json({ message: "Phone number must be exactly 10 digits." });
+        }
+        const formattedPhone = `+91${cleanPhone}`;
+
+        if (dateOfBirth) {
+            const dobError = validateDOB(dateOfBirth);
+            if (dobError) return res.status(400).json({ message: dobError });
         }
 
         if (typeof password !== "string") {
@@ -88,7 +97,7 @@ export const addStaff = async (req: Request, res: Response) => {
         const existing = await User.findOne({
             $or: [
                 { email: email.trim().toLowerCase() },
-                { phone: phone.trim() },
+                { phone: formattedPhone },
             ],
         });
 
@@ -101,10 +110,12 @@ export const addStaff = async (req: Request, res: Response) => {
         const newStaff = await User.create({
             name: name.trim(),
             email: email.trim().toLowerCase(),
-            phone: phone.trim(),
+            phone: formattedPhone,
             password,
             role: "staff",
             status: "active",
+            dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
+            gender: gender || undefined,
         });
 
         // Return without password
@@ -129,10 +140,10 @@ export const updateStaffStatus = async (req: Request, res: Response) => {
     try {
         const { status } = req.body;
 
-        if (!["active", "inactive", "banned"].includes(status)) {
+        if (!["active", "inactive"].includes(status)) {
             return res
                 .status(400)
-                .json({ message: "Status must be 'active', 'inactive', or 'banned'." });
+                .json({ message: "Status must be 'active' or 'inactive'." });
         }
 
         const staff = await User.findOneAndUpdate(
@@ -140,6 +151,69 @@ export const updateStaffStatus = async (req: Request, res: Response) => {
             { status },
             { new: true, runValidators: true }
         ).select("-__v");
+
+        if (!staff) {
+            return res.status(404).json({ message: "Staff member not found." });
+        }
+
+        res.status(200).json(staff);
+    } catch (error: any) {
+        res.status(500).json({
+            message:
+                process.env.NODE_ENV === "production"
+                    ? "Internal Server Error"
+                    : error.message,
+        });
+    }
+};
+
+/**
+ * Update Staff Details
+ */
+export const updateStaff = async (req: Request, res: Response) => {
+    try {
+        const { name, email, phone, dateOfBirth, gender } = req.body;
+        const updateData: any = { name, email, phone };
+
+        if (!name || !email || !phone) {
+            return res.status(400).json({ message: "Name, email, and phone are required." });
+        }
+        if (!isValidName(name)) {
+            return res.status(400).json({ message: "Name must be at least 3 characters and contain only letters." });
+        }
+        if (!isValidEmail(email)) {
+            return res.status(400).json({ message: "Invalid email address format." });
+        }
+        const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+        if (!isValidPhone(cleanPhone)) {
+            return res.status(400).json({ message: "Phone number must be exactly 10 digits." });
+        }
+        updateData.phone = `+91${cleanPhone}`;
+
+        if (dateOfBirth) {
+            const dobError = validateDOB(dateOfBirth);
+            if (dobError) return res.status(400).json({ message: dobError });
+            updateData.dateOfBirth = new Date(dateOfBirth);
+        }
+        if (gender) updateData.gender = gender;
+
+        let oldProfilePicture: string | undefined;
+        if (req.file) {
+            // Fetch old picture URL before overwriting
+            const existing = await User.findOne({ _id: req.params.id, role: "staff" }).select("profilePicture");
+            oldProfilePicture = existing?.profilePicture;
+            updateData.profilePicture = req.file.path;
+        }
+
+        const staff = await User.findOneAndUpdate(
+            { _id: req.params.id, role: "staff" },
+            updateData,
+            { new: true, runValidators: true }
+        ).select("-__v");
+
+        if (req.file && oldProfilePicture) {
+            await deleteImageFromCloudinary(oldProfilePicture);
+        }
 
         if (!staff) {
             return res.status(404).json({ message: "Staff member not found." });

@@ -110,7 +110,6 @@ const SecuritySettings: React.FC<SecuritySettingsProps> = ({ isSaving, onChangeP
                         <input
                             type="password"
                             style={inputStyle}
-                            placeholder="••••••••"
                             value={passwords.currentPassword}
                             onChange={e => setPasswords(prev => ({ ...prev, currentPassword: e.target.value }))}
                             required
@@ -123,7 +122,6 @@ const SecuritySettings: React.FC<SecuritySettingsProps> = ({ isSaving, onChangeP
                             <input
                                 type="password"
                                 style={inputStyle}
-                                placeholder="••••••••"
                                 value={passwords.newPassword}
                                 onChange={e => setPasswords(prev => ({ ...prev, newPassword: e.target.value }))}
                                 required
@@ -136,7 +134,6 @@ const SecuritySettings: React.FC<SecuritySettingsProps> = ({ isSaving, onChangeP
                             <input
                                 type="password"
                                 style={inputStyle}
-                                placeholder="••••••••"
                                 value={passwords.confirmPassword}
                                 onChange={e => setPasswords(prev => ({ ...prev, confirmPassword: e.target.value }))}
                                 required

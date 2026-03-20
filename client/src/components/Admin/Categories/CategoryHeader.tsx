@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import type { Category } from '../../../services/Admin/categoryService';
+import type { Category } from '../../../services/admin/categoryService';
 
 interface CategoryHeaderProps {
   categories: Category[];
@@ -11,7 +11,6 @@ interface CategoryHeaderProps {
 
 const CategoryHeader: React.FC<CategoryHeaderProps> = ({ categories, searchQuery, onSearchChange, onAddClick }) => {
   const total = categories.length;
-  const totalProducts = categories.reduce((sum, c) => sum + c.productCount, 0);
   const emptyCategories = categories.filter(c => c.productCount === 0).length;
 
   return (
@@ -60,11 +59,6 @@ const CategoryHeader: React.FC<CategoryHeaderProps> = ({ categories, searchQuery
             <span className="stat-dot" style={{ background: '#6366f1' }} />
             <span className="stat-count">{total}</span>
             Categories
-          </motion.div>
-          <motion.div className="stat-pill" whileHover={{ scale: 1.03 }}>
-            <span className="stat-dot" style={{ background: '#10b981' }} />
-            <span className="stat-count">{totalProducts}</span>
-            Products
           </motion.div>
           <motion.div className="stat-pill" whileHover={{ scale: 1.03 }}>
             <span className="stat-dot" style={{ background: '#f59e0b' }} />

@@ -208,7 +208,7 @@ export const refreshSession = async (req: Request, res: Response) => {
       return res.status(401).json({ message: "User not found." });
     }
 
-    // Prevent banned/inactive users from refreshing tokens
+    // Prevent inactive users from refreshing tokens
     if (user.status !== "active") {
       res.clearCookie("refreshToken", {
         httpOnly: true,

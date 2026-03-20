@@ -52,7 +52,7 @@ export const createCategory = async (req: Request, res: Response) => {
 export const getCategories = async (req: Request, res: Response) => {
     try {
         const page = Math.max(1, parseInt(req.query.page as string) || 1);
-        const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 50));
+        const limit = parseInt(req.query.limit as string) || 1000;
         const search = (req.query.search as string || "").trim();
         const skip = (page - 1) * limit;
 
@@ -186,12 +186,27 @@ export const assignProducts = async (req: Request, res: Response) => {
         // Get the current products before updating
         const previousProductIds = category.products.map((id: any) => id.toString());
 
-        // Verify all product IDs exist
-        const existingProducts = await Product.find({
-            _id: { $in: productIds },
-        }).select("_id");
+        // Check if any product already belongs to another category
+        const products = await Product.find({
+            _id: { $in: productIds }
+        }).select("name category");
 
-        const validIds = existingProducts.map((p) => p._id);
+        const conflicting = products.filter(
+            (p) => p.category && p.category !== category.name
+        );
+
+        if (conflicting.length > 0) {
+            return res.status(400).json({
+                message: "Some products already belong to another category",
+                errors: conflicting.map((p) => ({
+                    field: "productIds",
+                    message: `${p.name} already belongs to "${p.category}"`,
+                })),
+            });
+        }
+
+        // Only valid product IDs
+        const validIds = products.map((p) => p._id);
         const validIdStrings = validIds.map((id: any) => id.toString());
 
         // Update the category's products array
@@ -237,7 +252,7 @@ export const updateCategory = async (req: Request, res: Response) => {
     try {
         const { name, description } = req.body;
         // 1. Explicitly cast to string to satisfy TypeScript
-        const categoryId = req.params.id as string; 
+        const categoryId = req.params.id as string;
 
         // Validation
         if (!name || typeof name !== "string" || name.trim().length === 0) {
@@ -251,7 +266,7 @@ export const updateCategory = async (req: Request, res: Response) => {
         const existing = await Category.findOne({
             name: { $regex: new RegExp(`^${escapeRegex(name.trim())}$`, "i") },
             // 2. Convert the string to a Mongoose ObjectId
-            _id: { $ne: new mongoose.Types.ObjectId(categoryId) } 
+            _id: { $ne: new mongoose.Types.ObjectId(categoryId) }
         });
 
         if (existing) {

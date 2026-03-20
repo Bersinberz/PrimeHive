@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import {
@@ -6,11 +6,8 @@ import {
   createCategory,
   updateCategory,
   deleteCategory,
-  getCategoryProducts,
-  assignProducts,
   type Category,
-} from '../../services/Admin/categoryService';
-import { getProducts, type Product } from '../../services/Admin/productService';
+} from '../../services/admin/categoryService';
 
 import PrimeLoader from '../../components/PrimeLoader';
 import ToastNotification from '../../components/Admin/ToastNotification';
@@ -18,14 +15,21 @@ import AssignProducts from '../../components/Admin/Categories/AssignProducts';
 import CategoryForm from '../../components/Admin/Categories/CategoryForm';
 import CategoryHeader from '../../components/Admin/Categories/CategoryHeader';
 import CategoryList from '../../components/Admin/Categories/CategoryList';
-import DeleteConfirmModal from '../../components/Admin/DeleteConfirmModal';
-
+import ActionConfirmModal from '../../components/Admin/ActionConfirmModal';
 
 const CategoryManagement: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
+
+  // Search
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Pagination
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
+
   const [toast, setToast] = useState<{ type: 'success' | 'error'; title: string; message: string } | null>(null);
 
   // Overlay States
@@ -35,8 +39,6 @@ const CategoryManagement: React.FC = () => {
 
   // Assign Drawer States
   const [categoryToAssign, setCategoryToAssign] = useState<Category | null>(null);
-  const [allProducts, setAllProducts] = useState<Product[]>([]);
-  const [assignedProductIds, setAssignedProductIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (toast) {
@@ -45,21 +47,39 @@ const CategoryManagement: React.FC = () => {
     }
   }, [toast]);
 
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await getCategories();
+      const data = await getCategories({ page: 1, limit: 1000 });
       setCategories(data);
+      setPage(1);
+      setHasMore(false);
     } catch (error: any) {
       setToast({ type: 'error', title: 'Fetch Failed', message: error?.message || 'Could not load categories.' });
     } finally {
       setIsLoading(false);
     }
+  }, []);
+
+  const fetchMoreCategories = async () => {
+    if (isFetchingMore || !hasMore) return;
+    setIsFetchingMore(true);
+    try {
+      const nextPage = page + 1;
+      const data = await getCategories({ page: nextPage, limit: 1000 });
+      setCategories(prev => [...prev, ...data]);
+      setPage(nextPage);
+      setHasMore(false);
+    } catch (error: any) {
+      setToast({ type: 'error', title: 'Load Failed', message: 'Could not load more categories.' });
+    } finally {
+      setIsFetchingMore(false);
+    }
   };
 
   useEffect(() => {
     fetchCategories();
-  }, []);
+  }, [fetchCategories]);
 
   // --- Form Modal Handlers ---
   const handleOpenAddModal = () => {
@@ -90,7 +110,7 @@ const CategoryManagement: React.FC = () => {
       handleCloseFormModal();
       fetchCategories();
     } catch (error: any) {
-      throw error; // Let CategoryFormModal catch and map validation errors
+      throw error;
     } finally {
       setIsSaving(false);
     }
@@ -103,7 +123,7 @@ const CategoryManagement: React.FC = () => {
     try {
       await deleteCategory(categoryToDelete._id);
       setToast({ type: 'success', title: 'Deleted', message: 'Category removed successfully.' });
-      fetchCategories();
+      setCategories(prev => prev.filter(c => c._id !== categoryToDelete._id));
     } catch (error: any) {
       setToast({ type: 'error', title: 'Delete Failed', message: error?.message || 'Could not delete category.' });
     } finally {
@@ -112,45 +132,23 @@ const CategoryManagement: React.FC = () => {
     }
   };
 
-  // --- Assign Drawer Handlers ---
-  const handleOpenAssign = async (category: Category) => {
-    setIsLoading(true);
-    try {
-      const [productsData, assignedData] = await Promise.all([
-        getProducts(),
-        getCategoryProducts(category._id),
-      ]);
-      setAllProducts(productsData);
-      setAssignedProductIds(assignedData.map((p: any) => p._id));
-      setCategoryToAssign(category);
-    } catch (error: any) {
-      setToast({ type: 'error', title: 'Load Failed', message: 'Could not load products for assignment.' });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSaveAssignments = async (categoryId: string, selectedIds: string[]) => {
-    setIsSaving(true);
-    try {
-      await assignProducts(categoryId, selectedIds);
-      setToast({ type: 'success', title: 'Assigned', message: 'Products successfully updated for this category.' });
-      setCategoryToAssign(null);
-      fetchCategories(); // Refresh product counts
-    } catch (error: any) {
-      setToast({ type: 'error', title: 'Error', message: 'Could not save assignments.' });
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mx-auto position-relative pb-5" style={{ maxWidth: '1400px', minHeight: '80vh' }}>
-
-      {/* Globals */}
-      <PrimeLoader isLoading={isLoading || isSaving} />
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.4, ease: "easeOut" }}
+      className="mx-auto position-relative pb-5"
+      style={{ maxWidth: '1400px', minHeight: '80vh', display: 'flex', flexDirection: 'column' }}
+    >
+      <PrimeLoader isLoading={isSaving} />
       <ToastNotification toast={toast} onClose={() => setToast(null)} />
-      <DeleteConfirmModal product={categoryToDelete as any} onConfirm={confirmDelete} onCancel={() => setCategoryToDelete(null)} />
+      <ActionConfirmModal 
+        isOpen={!!categoryToDelete}
+        actionType="delete"
+        itemName={categoryToDelete?.name || ''}
+        onConfirm={confirmDelete} 
+        onCancel={() => setCategoryToDelete(null)} 
+      />
 
       {/* 1. Add/Edit Category Modal */}
       <AnimatePresence>
@@ -170,16 +168,14 @@ const CategoryManagement: React.FC = () => {
         {categoryToAssign && (
           <AssignProducts
             category={categoryToAssign}
-            availableProducts={allProducts}
-            initialAssignedIds={assignedProductIds}
-            isSaving={isSaving}
-            onSaveAssignments={handleSaveAssignments}
-            onCancel={() => setCategoryToAssign(null)}
+            onClose={() => setCategoryToAssign(null)}
+            showToast={setToast}
+            refreshCategories={fetchCategories}
           />
         )}
       </AnimatePresence>
 
-      {/* Base Page Content (Always visible behind modals) */}
+      {/* Base Page Content */}
       <CategoryHeader
         categories={categories}
         searchQuery={searchQuery}
@@ -190,11 +186,14 @@ const CategoryManagement: React.FC = () => {
       <CategoryList
         categories={categories}
         isLoading={isLoading}
+        isFetchingMore={isFetchingMore}
+        hasMore={hasMore}
         searchQuery={searchQuery}
         onAddFirst={handleOpenAddModal}
         onEdit={handleOpenEditModal}
-        onAssign={handleOpenAssign}
+        onAssign={setCategoryToAssign}
         onDelete={setCategoryToDelete}
+        onLoadMore={fetchMoreCategories}
       />
 
     </motion.div>
