@@ -1,6 +1,26 @@
 import mongoose, { Document } from "mongoose";
 import bcrypt from "bcryptjs";
 
+export interface IPermissions {
+  dashboard:  { view: boolean };
+  products:   { view: boolean; create: boolean; edit: boolean; delete: boolean };
+  categories: { view: boolean; create: boolean; edit: boolean; delete: boolean };
+  orders:     { view: boolean; updateStatus: boolean };
+  customers:  { view: boolean; edit: boolean; delete: boolean };
+  staff:      { view: boolean; create: boolean; edit: boolean; delete: boolean };
+  settings:   { view: boolean; edit: boolean };
+}
+
+export const DEFAULT_STAFF_PERMISSIONS: IPermissions = {
+  dashboard:  { view: true },
+  products:   { view: true,  create: false, edit: false, delete: false },
+  categories: { view: true,  create: false, edit: false, delete: false },
+  orders:     { view: true,  updateStatus: false },
+  customers:  { view: true,  edit: false, delete: false },
+  staff:      { view: false, create: false, edit: false, delete: false },
+  settings:   { view: false, edit: false },
+};
+
 export interface IUser extends Document {
   name: string;
   email: string;
@@ -13,6 +33,20 @@ export interface IUser extends Document {
   addresses?: mongoose.Types.ObjectId[];
   deletedAt?: Date;
   dateOfBirth?: Date;
+  permissions?: IPermissions;
+  isPasswordSet: boolean;
+  passwordSetToken?: string;
+  passwordSetExpires?: Date;
+  // Staff store profile
+  storeName?: string;
+  storeDescription?: string;
+  storeLocation?: string;
+  storePhone?: string;
+  // Notification preferences
+  notificationPreferences?: {
+    orderPlaced: boolean;
+    lowStock: boolean;
+  };
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
@@ -66,7 +100,33 @@ const userSchema = new mongoose.Schema<IUser>(
     deletedAt: { type: Date, default: null },
     dateOfBirth: {
       type: Date
-    }
+    },
+    permissions: {
+      type: mongoose.Schema.Types.Mixed,
+      default: undefined,
+    },
+    isPasswordSet: {
+      type: Boolean,
+      default: true, // existing users (customers, superadmin) are always true
+    },
+    passwordSetToken: {
+      type: String,
+      select: false,
+    },
+    passwordSetExpires: {
+      type: Date,
+      select: false,
+    },
+    // Staff store profile
+    storeName:        { type: String, trim: true, maxlength: 100 },
+    storeDescription: { type: String, trim: true, maxlength: 500 },
+    storeLocation:    { type: String, trim: true, maxlength: 200 },
+    storePhone:       { type: String, trim: true, maxlength: 20 },
+    // Notification preferences (staff)
+    notificationPreferences: {
+      orderPlaced: { type: Boolean, default: true },
+      lowStock:    { type: Boolean, default: true },
+    },
   },
   { timestamps: true }
 );

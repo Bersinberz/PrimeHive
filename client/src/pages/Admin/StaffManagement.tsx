@@ -5,10 +5,12 @@ import {
     addStaff,
     updateStaffStatus,
     deleteStaff,
+    hardDeleteStaff,
+    revokeStaffDeletion,
     type Staff,
 } from '../../services/admin/staffService';
+import { useToast } from '../../context/ToastContext';
 import PrimeLoader from '../../components/PrimeLoader';
-import ToastNotification from '../../components/Admin/ToastNotification';
 
 import StaffHeader from '../../components/Admin/Staff/StaffHeader';
 import StaffList from '../../components/Admin/Staff/StaffList';
@@ -26,33 +28,31 @@ const StaffManagement: React.FC = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
-    const [toast, setToast] = useState<{ type: 'success' | 'error'; title: string; message: string } | null>(null);
 
     const [form, setForm] = useState<{ 
         name: string; 
         email: string; 
         phone: string; 
-        password?: string; 
+        password?: string;
+        newPassword?: string;
         profilePicture: File | null; 
         existingProfilePicture?: string;
         dateOfBirth: string;
         gender: string;
+        permissions?: any;
     }>({ 
         name: '', 
         email: '', 
         phone: '', 
-        password: '', 
+        password: '',
+        newPassword: '',
         profilePicture: null,
         dateOfBirth: '',
-        gender: ''
+        gender: '',
+        permissions: undefined,
     });
 
-    useEffect(() => {
-        if (toast) {
-            const timer = setTimeout(() => setToast(null), 4000);
-            return () => clearTimeout(timer);
-        }
-    }, [toast]);
+    const { showToast } = useToast();
 
     useEffect(() => { loadStaff(); }, []);
 
@@ -61,7 +61,7 @@ const StaffManagement: React.FC = () => {
             const data = await getStaff();
             setStaffList(data);
         } catch {
-            setToast({ type: 'error', title: 'Load Failed', message: 'Could not load staff members.' });
+            showToast({ type: 'error', title: 'Couldn\'t load staff', message: 'Something went wrong. Please refresh and try again.' });
         } finally {
             setIsLoading(false);
         }
@@ -75,16 +75,16 @@ const StaffManagement: React.FC = () => {
                 name: form.name,
                 email: form.email,
                 phone: form.phone,
-                password: form.password || '',
                 dateOfBirth: form.dateOfBirth || undefined,
-                gender: form.gender || undefined
+                gender: form.gender || undefined,
+                permissions: form.permissions || undefined,
             });
             setStaffList(prev => [newStaff, ...prev]);
             setForm({ name: '', email: '', phone: '', password: '', profilePicture: null, dateOfBirth: '', gender: '' });
             setIsAddModalOpen(false);
-            setToast({ type: 'success', title: 'Created', message: `${newStaff.name} added as staff.` });
+            showToast({ type: 'success', title: 'Staff member added', message: `${newStaff.name} now has access to the admin panel.` });
         } catch (err: any) {
-            setToast({ type: 'error', title: 'Failed', message: err?.response?.data?.message || err?.message || 'Could not add staff.' });
+            showToast({ type: 'error', title: 'Couldn\'t add staff', message: err?.response?.data?.message || err?.message || 'Something went wrong. Please try again.' });
         } finally {
             setIsSaving(false);
         }
@@ -102,6 +102,8 @@ const StaffManagement: React.FC = () => {
                 formData.append('phone', form.phone);
                 if (form.dateOfBirth) formData.append('dateOfBirth', form.dateOfBirth);
                 if (form.gender) formData.append('gender', form.gender);
+                if (form.newPassword) formData.append('password', form.newPassword);
+                if (form.permissions) formData.append('permissions', JSON.stringify(form.permissions));
                 if (form.profilePicture) {
                     formData.append('profilePicture', form.profilePicture);
                 }
@@ -110,9 +112,9 @@ const StaffManagement: React.FC = () => {
                 setStaffList(prev => prev.map(s => s._id === updated._id ? updated : s));
                 setSelectedStaff(updated);
                 setIsEditModalOpen(false);
-                setToast({ type: 'success', title: 'Updated', message: 'Staff details updated.' });
+                showToast({ type: 'success', title: 'Changes saved', message: 'Staff profile has been updated.' });
             } catch (err: any) {
-                setToast({ type: 'error', title: 'Failed', message: err?.response?.data?.message || err?.message || 'Could not update staff.' });
+                showToast({ type: 'error', title: 'Couldn\'t save changes', message: err?.response?.data?.message || err?.message || 'Something went wrong. Please try again.' });
             } finally {
                 setIsSaving(false);
             }
@@ -125,10 +127,10 @@ const StaffManagement: React.FC = () => {
             const updated = await updateStaffStatus(id, status);
             setStaffList(prev => prev.map(s => s._id === id ? updated : s));
             if (selectedStaff?._id === id) setSelectedStaff(updated);
-            const label = status === 'active' ? 'Activated' : status === 'inactive' ? 'Deactivated' : 'Banned';
-            setToast({ type: 'success', title: label, message: `Staff status updated to ${status}.` });
+            const label = status === 'active' ? 'Account activated' : 'Account deactivated';
+            showToast({ type: 'success', title: label, message: `This staff member's access is now ${status}.` });
         } catch (err: any) {
-            setToast({ type: 'error', title: 'Failed', message: err?.message || 'Could not update status.' });
+            showToast({ type: 'error', title: 'Couldn\'t update status', message: err?.message || 'Something went wrong. Please try again.' });
         } finally {
             setIsSaving(false);
         }
@@ -138,11 +140,43 @@ const StaffManagement: React.FC = () => {
         setIsSaving(true);
         try {
             await deleteStaff(id);
-            setStaffList(prev => prev.filter(s => s._id !== id));
-            if (selectedStaff?._id === id) { setView('list'); setSelectedStaff(null); }
-            setToast({ type: 'success', title: 'Deleted', message: 'Staff member removed.' });
+            const now = new Date().toISOString();
+            setStaffList(prev => prev.map(s => s._id === id ? { ...s, status: 'deleted' as const, deletedAt: now } : s));
+            if (selectedStaff?._id === id) {
+                setSelectedStaff(prev => prev ? { ...prev, status: 'deleted' as const, deletedAt: now } : null);
+            }
+            showToast({ type: 'success', title: 'Staff member removed', message: 'Their account has been scheduled for deletion in 30 days.' });
         } catch (err: any) {
-            setToast({ type: 'error', title: 'Failed', message: err?.message || 'Could not delete.' });
+            showToast({ type: 'error', title: 'Couldn\'t delete', message: err?.message || 'Something went wrong. Please try again.' });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleHardDelete = async (id: string) => {
+        setIsSaving(true);
+        try {
+            await hardDeleteStaff(id);
+            setStaffList(prev => prev.filter(s => s._id !== id));
+            setView('list');
+            setSelectedStaff(null);
+            showToast({ type: 'success', title: 'Permanently deleted', message: 'The staff account has been erased from the system.' });
+        } catch (err: any) {
+            showToast({ type: 'error', title: 'Couldn\'t delete', message: err?.message || 'Something went wrong. Please try again.' });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleRevokeDelete = async (id: string) => {
+        setIsSaving(true);
+        try {
+            const restored = await revokeStaffDeletion(id);
+            setStaffList(prev => prev.map(s => s._id === id ? restored : s));
+            setSelectedStaff(restored);
+            showToast({ type: 'success', title: 'Account restored', message: 'The staff account has been reactivated.' });
+        } catch (err: any) {
+            showToast({ type: 'error', title: 'Couldn\'t restore', message: err?.message || 'Something went wrong. Please try again.' });
         } finally {
             setIsSaving(false);
         }
@@ -175,7 +209,6 @@ const StaffManagement: React.FC = () => {
             }}
         >
             <PrimeLoader isLoading={isLoading || isSaving} />
-            <ToastNotification toast={toast} onClose={() => setToast(null)} />
 
             <AnimatePresence mode="wait">
                 {/* ── LIST VIEW ── */}
@@ -213,18 +246,21 @@ const StaffManagement: React.FC = () => {
                                     name: selectedStaff.name, 
                                     email: selectedStaff.email, 
                                     phone: selectedStaff.phone, 
-                                    password: '', 
+                                    password: '',
+                                    newPassword: '',
                                     profilePicture: null, 
                                     existingProfilePicture: selectedStaff.profilePicture,
                                     dateOfBirth: selectedStaff.dateOfBirth ? new Date(selectedStaff.dateOfBirth).toISOString().split('T')[0] : '',
-                                    gender: selectedStaff.gender || ''
+                                    gender: selectedStaff.gender || '',
+                                    permissions: (selectedStaff as any).permissions || undefined,
                                 });
                                 setIsEditModalOpen(true);
                             }}
                             onStatusChange={handleStatusChange} 
-                            onDelete={handleDelete} 
-                        />
-                    </motion.div>
+                            onDelete={handleDelete}
+                            onHardDelete={handleHardDelete}
+                            onRevokeDelete={handleRevokeDelete}
+                        />                    </motion.div>
                 )}
             </AnimatePresence>
 

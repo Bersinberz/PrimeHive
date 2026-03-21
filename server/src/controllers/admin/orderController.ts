@@ -1,9 +1,12 @@
 import { Request, Response } from "express";
 import Order from "../../models/Order";
 import Product from "../../models/Product";
+import mongoose from "mongoose";
 
 /**
  * Get All Orders (admin list view — paginated with search)
+ * Superadmin: all orders
+ * Staff: only orders containing products they created
  */
 export const getOrders = async (req: Request, res: Response) => {
     try {
@@ -15,6 +18,19 @@ export const getOrders = async (req: Request, res: Response) => {
         const filter: any = {};
         if (search) {
             filter.orderId = { $regex: search, $options: "i" };
+        }
+
+        // Staff: scope to orders that contain their products
+        if (req.user?.role === "staff") {
+            const staffProductIds = await Product.find({ createdBy: new mongoose.Types.ObjectId(req.user.id) })
+                .select("_id")
+                .lean()
+                .then(ps => ps.map(p => p._id));
+
+            if (staffProductIds.length === 0) {
+                return res.status(200).json({ data: [], pagination: { page, limit, total: 0, totalPages: 0 } });
+            }
+            filter["items.product"] = { $in: staffProductIds };
         }
 
         const [orders, total] = await Promise.all([
@@ -29,19 +45,11 @@ export const getOrders = async (req: Request, res: Response) => {
 
         res.status(200).json({
             data: orders,
-            pagination: {
-                page,
-                limit,
-                total,
-                totalPages: Math.ceil(total / limit),
-            },
+            pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
         });
     } catch (error: any) {
         res.status(500).json({
-            message:
-                process.env.NODE_ENV === "production"
-                    ? "Internal Server Error"
-                    : error.message,
+            message: process.env.NODE_ENV === "production" ? "Internal Server Error" : error.message,
         });
     }
 };

@@ -55,6 +55,7 @@ export const createProduct = async (req: Request, res: Response) => {
             stock,
             status: status || "active",
             images: imageUrls,
+            createdBy: req.user!.id,
         });
 
         // Sync: add product to the Category's products array
@@ -82,11 +83,11 @@ export const createProduct = async (req: Request, res: Response) => {
 export const getProducts = async (req: Request, res: Response) => {
     try {
         const page = Math.max(1, parseInt(req.query.page as string) || 1);
-        const limit = parseInt(req.query.limit as string) || 1000;
+        const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 50));
         const search = (req.query.search as string || "").trim();
         const skip = (page - 1) * limit;
 
-        const filter: any = {};
+        const filter: Record<string, unknown> = {};
         if (search) {
             filter.$or = [
                 { name: { $regex: search, $options: "i" } },
@@ -154,7 +155,7 @@ export const updateProduct = async (req: Request, res: Response) => {
 
         const imageUrls = files?.map((file: any) => file.path) || [];
 
-        const updateData: any = {
+        const updateData: Record<string, unknown> = {
             name,
             description,
             price,

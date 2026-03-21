@@ -4,6 +4,8 @@ export interface ISettings extends Document {
     // General
     storeName: string;
     supportEmail: string;
+    supportPhone: string;
+    storeLocation: string;
     currency: string;
     timezone: string;
     orderIdPrefix: string;
@@ -30,6 +32,18 @@ const settingsSchema = new Schema<ISettings>(
             trim: true,
             lowercase: true,
             maxlength: 150,
+        },
+        supportPhone: {
+            type: String,
+            default: "+9118001234567",
+            trim: true,
+            maxlength: 20,
+        },
+        storeLocation: {
+            type: String,
+            default: "123 Tech Park, Bangalore",
+            trim: true,
+            maxlength: 250,
         },
         currency: {
             type: String,

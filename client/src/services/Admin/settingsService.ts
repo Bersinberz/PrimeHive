@@ -4,6 +4,8 @@ export interface StoreSettings {
     _id: string;
     storeName: string;
     supportEmail: string;
+    supportPhone: string;
+    storeLocation: string;
     currency: string;
     timezone: string;
     orderIdPrefix: string;

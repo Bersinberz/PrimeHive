@@ -207,7 +207,6 @@ body,
 }
 
 .product-card:hover {
-  transform: translateY(var(--card-hover-lift));
   box-shadow: var(--card-hover-shadow);
   border-color: rgba(255, 140, 66, 0.2);
 }
@@ -227,9 +226,7 @@ body,
   transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.product-card:hover .product-card-image img {
-  transform: scale(1.08);
-}
+/* Hover scale removed as per user request */
 
 .product-card-image .status-badge {
   position: absolute;
@@ -646,8 +643,7 @@ body,
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 24px;
-  padding: 40px;
-  max-width: 440px;
+  max-width: 680px;
   width: 90%;
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.15);
 }

@@ -10,6 +10,7 @@ export interface IProduct extends Document {
   stock: number;
   status: "active" | "draft" | "archived";
   images: string[];
+  createdBy?: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -73,6 +74,12 @@ const ProductSchema = new Schema<IProduct>(
         validator: (v: string[]) => v.length <= 5,
         message: "Maximum 5 images allowed per product",
       },
+    },
+
+    createdBy: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
     },
   },
   {

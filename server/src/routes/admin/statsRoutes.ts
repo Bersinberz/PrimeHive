@@ -1,12 +1,9 @@
 import express from "express";
 import { getDashboardStats } from "../../controllers/admin/statsController";
-import { adminOnly, verifyToken } from "../../middleware/verifyToken";
+import { adminOnly, verifyToken, checkPermission } from "../../middleware/verifyToken";
 
 const router = express.Router();
 
-/**
- * Get Dashboard + Analytics Stats
- */
-router.get("/", verifyToken, adminOnly, getDashboardStats);
+router.get("/", verifyToken, adminOnly, checkPermission("dashboard", "view"), getDashboardStats);
 
 export default router;

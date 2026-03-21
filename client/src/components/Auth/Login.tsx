@@ -64,7 +64,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ setIsLogin }) => {
 
       const user = await login(trimmedEmail, password);
 
-      if (user.role === "superadmin") {
+      if (user.role === "superadmin" || user.role === "staff") {
         navigate("/admin/dashboard");
       } else {
         navigate("/");

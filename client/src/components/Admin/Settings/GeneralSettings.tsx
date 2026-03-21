@@ -6,6 +6,8 @@ interface GeneralSettingsProps {
     form: {
         storeName: string;
         supportEmail: string;
+        supportPhone: string;
+        storeLocation: string;
         orderIdPrefix: string;
     };
     formErrors: Record<string, string>;
@@ -50,6 +52,47 @@ const GeneralSettings: React.FC<GeneralSettingsProps> = ({ form, formErrors, onI
                         placeholder="support@yourstore.com"
                     />
                     {formErrors.supportEmail && <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '6px', fontWeight: 600 }}>{formErrors.supportEmail}</div>}
+                </div>
+                <div>
+                    <label style={labelStyle}>Support Phone *</label>
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                        <div style={{
+                            position: 'absolute', left: '14px', display: 'flex', alignItems: 'center', gap: '8px',
+                            fontSize: '0.92rem', fontWeight: 600, color: '#555', pointerEvents: 'none'
+                        }}>
+                            <span style={{ fontSize: '1.1rem' }}>🇮🇳</span>
+                            <span>+91</span>
+                            <div style={{ width: '1.5px', height: '18px', background: '#e0e0e0', marginLeft: '2px' }} />
+                        </div>
+                        <input
+                            type="tel"
+                            name="supportPhone"
+                            style={{ ...inputStyle, paddingLeft: '92px', borderColor: formErrors.supportPhone ? '#ef4444' : '#f0f0f2' }}
+                            value={form.supportPhone ? form.supportPhone.replace(/^\+?91/, '') : ''}
+                            onChange={(e) => {
+                                const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                                onInputChange({ target: { name: 'supportPhone', value: val ? `+91${val}` : '', type: 'tel' } } as any);
+                            }}
+                            onFocus={focusHandlers.onFocus}
+                            onBlur={(e) => { e.currentTarget.style.boxShadow = 'none'; onBlur(e); }}
+                            placeholder="1800 123 4567"
+                        />
+                    </div>
+                    {formErrors.supportPhone && <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '6px', fontWeight: 600 }}>{formErrors.supportPhone}</div>}
+                </div>
+                <div>
+                    <label style={labelStyle}>Store Main Location *</label>
+                    <input
+                        type="text"
+                        name="storeLocation"
+                        style={{ ...inputStyle, borderColor: formErrors.storeLocation ? '#ef4444' : '#f0f0f2' }}
+                        value={form.storeLocation}
+                        onChange={onInputChange}
+                        onFocus={focusHandlers.onFocus}
+                        onBlur={(e) => { e.currentTarget.style.boxShadow = 'none'; onBlur(e); }}
+                        placeholder="123 Tech Park, Bangalore"
+                    />
+                    {formErrors.storeLocation && <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '6px', fontWeight: 600 }}>{formErrors.storeLocation}</div>}
                 </div>
                 <div>
                     <label style={labelStyle}>Store Currency</label>

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { getDashboardStats, type DashboardStats } from '../../services/admin/statsService';
-import ToastNotification from '../../components/Admin/ToastNotification';
+import { useToast } from '../../context/ToastContext';
+import { useAuth } from '../../context/AuthContext';
 import PrimeLoader from '../../components/PrimeLoader';
 
 import SummaryWidgets from '../../components/Admin/Dashboard/SummaryWidgets';
@@ -14,30 +15,21 @@ import DashboardErrorState from '../../components/Admin/Dashboard/ErrorState';
 const AdminDashboard: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [toast, setToast] = useState<{ type: 'success' | 'error'; title: string; message: string } | null>(null);
-
-  useEffect(() => {
-    if (toast) {
-      const timer = setTimeout(() => setToast(null), 4000);
-      return () => clearTimeout(timer);
-    }
-  }, [toast]);
+  const { showToast } = useToast();
+  const { user } = useAuth();
+  const isStaff = user?.role === 'staff';
 
   const fetchStats = useCallback(async () => {
     setIsLoading(true);
     try {
       const data = await getDashboardStats();
       setStats(data);
-    } catch (error: any) {
-      setToast({
-        type: 'error',
-        title: 'Load Failed',
-        message: 'Could not load dashboard data.'
-      });
+    } catch {
+      showToast({ type: 'error', title: 'Something went wrong', message: 'We couldn\'t load your dashboard. Please try again.' });
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [showToast]);
 
   useEffect(() => {
     fetchStats();
@@ -45,73 +37,49 @@ const AdminDashboard: React.FC = () => {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 15 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, ease: "easeOut" }}
-      className="mx-auto"
-      style={{
-        maxWidth: '1400px',
-        minHeight: '80vh',
-        position: 'relative',
-        display: 'flex',
-        flexDirection: 'column'
-      }}
+      style={{ maxWidth: '1400px', minHeight: '80vh', margin: '0 auto', position: 'relative', display: 'flex', flexDirection: 'column' }}
     >
-      <ToastNotification toast={toast} onClose={() => setToast(null)} />
-
       <PrimeLoader isLoading={isLoading} />
 
       {!isLoading && (
-        <>
-          <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-5 gap-3">
-            <div>
-              <h2 className="fw-bolder mb-1 text-dark" style={{ letterSpacing: '-0.5px' }}>Dashboard Overview</h2>
-              <p className="text-muted mb-0">Here's what's happening with your store today.</p>
-            </div>
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: 'easeOut' }}
+        >
+          {/* Page Header */}
+          <div style={{ marginBottom: '32px' }}>
+            <p style={{ fontSize: '0.72rem', fontWeight: 800, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.8px', margin: '0 0 4px' }}>
+              Overview
+            </p>
+            <h2 style={{ fontSize: '2rem', fontWeight: 900, color: '#1a1a1a', letterSpacing: '-1px', margin: '0 0 6px' }}>
+              Dashboard
+            </h2>
+            <p style={{ color: '#999', fontSize: '0.9rem', fontWeight: 500, margin: 0 }}>
+              {isStaff ? "Here's how your products are performing." : "Here's what's happening with your store today."}
+            </p>
           </div>
 
           {stats ? (
-            <motion.div
-              initial="hidden"
-              animate="visible"
-              variants={{
-                hidden: { opacity: 0 },
-                visible: {
-                  opacity: 1,
-                  transition: {
-                    staggerChildren: 0.1
-                  }
-                }
-              }}
-            >
-              <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}>
-                <SummaryWidgets stats={stats} />
-              </motion.div>
+            <>
+              <SummaryWidgets stats={stats} isStaff={isStaff} />
 
-              <div className="row g-4 mb-5">
-                <motion.div className="col-12 col-lg-8" variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}>
-                  <RevenueChart data={stats.revenueByDay} />
-                </motion.div>
-                <motion.div className="col-12 col-lg-4" variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}>
-                  <OrderStatusChart data={stats.ordersByStatus} />
-                </motion.div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '20px', marginBottom: '20px' }}>
+                <RevenueChart data={stats.revenueByDay} />
+                <OrderStatusChart data={stats.ordersByStatus} />
               </div>
 
-              <div className="row g-4 pb-5">
-                <motion.div className="col-12 col-xl-8" variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}>
-                  <RecentTransactions orders={stats.recentOrders} />
-                </motion.div>
-                <motion.div className="col-12 col-xl-4 d-flex flex-column gap-4" variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}>
-                  <LowStockAlerts products={stats.lowStockProducts} />
-                </motion.div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '20px', paddingBottom: '40px' }}>
+                <RecentTransactions orders={stats.recentOrders} />
+                <LowStockAlerts products={stats.lowStockProducts} />
               </div>
-            </motion.div>
+            </>
           ) : (
-            <div className="py-4">
+            <div style={{ paddingTop: '16px' }}>
               <DashboardErrorState onRetry={fetchStats} />
             </div>
           )}
-        </>
+        </motion.div>
       )}
     </motion.div>
   );

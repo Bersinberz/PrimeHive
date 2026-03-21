@@ -36,33 +36,34 @@ export interface PaginatedResponse<T> {
   };
 }
 
-// Create product
-export const createProduct = async (
-  payload: CreateProductPayload
-): Promise<Product> => {
-  const formData = new FormData();
+// ==========================================
+// Helpers
+// ==========================================
 
+const buildProductFormData = (payload: CreateProductPayload): FormData => {
+  const formData = new FormData();
   formData.append("name", payload.name);
   formData.append("description", payload.description);
   formData.append("price", payload.price.toString());
   formData.append("category", payload.category);
   formData.append("sku", payload.sku);
   formData.append("stock", payload.stock.toString());
-
   if (payload.comparePrice) {
     formData.append("comparePrice", payload.comparePrice.toString());
   }
+  payload.images.forEach((image) => formData.append("images", image));
+  return formData;
+};
 
-  payload.images.forEach((image) => {
-    formData.append("images", image);
-  });
-
+// Create product
+export const createProduct = async (
+  payload: CreateProductPayload
+): Promise<Product> => {
   const response = await axiosInstance.post(
     "admin/products/create",
-    formData,
+    buildProductFormData(payload),
     { headers: { "Content-Type": "multipart/form-data" } }
   );
-
   return response.data;
 };
 
@@ -78,24 +79,7 @@ export const getProductById = async (id: string): Promise<Product> => {
 
 
 export const updateProduct = async (id: string, payload: CreateProductPayload): Promise<Product> => {
-  const formData = new FormData();
-
-  formData.append("name", payload.name);
-  formData.append("description", payload.description);
-  formData.append("price", payload.price.toString());
-  formData.append("category", payload.category);
-  formData.append("sku", payload.sku);
-  formData.append("stock", payload.stock.toString());
-
-  if (payload.comparePrice) {
-    formData.append("comparePrice", payload.comparePrice.toString());
-  }
-
-  payload.images.forEach((image) => {
-    formData.append("images", image);
-  });
-
-  const response = await axiosInstance.put(`admin/products/update/${id}`, formData, {
+  const response = await axiosInstance.put(`admin/products/update/${id}`, buildProductFormData(payload), {
     headers: { "Content-Type": "multipart/form-data" },
   });
   return response.data;

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ImageCropperModal from '../ImageCropperModal';
+import { useAuth } from '../../../context/AuthContext';
+import type { Permissions } from '../../../services/authService';
 
 const inputStyle: React.CSSProperties = {
     width: '100%', padding: '14px 16px', borderRadius: '14px',
@@ -29,6 +31,33 @@ const focusHandlers = {
     },
 };
 
+const pwdRules = [
+    { id: 'length',    text: 'At least 6 characters',  test: (v: string) => v.length >= 6 },
+    { id: 'noSpaces',  text: 'No spaces',               test: (v: string) => v.length > 0 && !/\s/.test(v) },
+    { id: 'uppercase', text: 'One uppercase letter',    test: (v: string) => /[A-Z]/.test(v) },
+    { id: 'lowercase', text: 'One lowercase letter',    test: (v: string) => /[a-z]/.test(v) },
+    { id: 'number',    text: 'One number',              test: (v: string) => /[0-9]/.test(v) },
+    { id: 'special',   text: 'One special character',   test: (v: string) => /[!@#$%^&*(),.?":{}|<>]/.test(v) },
+];
+
+const permissionModules: { key: keyof Permissions; label: string; actions: { key: string; label: string }[] }[] = [
+    { key: 'dashboard',  label: 'Dashboard',  actions: [{ key: 'view', label: 'View' }] },
+    { key: 'products',   label: 'Products',   actions: [{ key: 'view', label: 'View' }, { key: 'create', label: 'Create' }, { key: 'edit', label: 'Edit' }, { key: 'delete', label: 'Delete' }] },
+    { key: 'categories', label: 'Categories', actions: [{ key: 'view', label: 'View' }, { key: 'create', label: 'Create' }, { key: 'edit', label: 'Edit' }, { key: 'delete', label: 'Delete' }] },
+    { key: 'orders',     label: 'Orders',     actions: [{ key: 'view', label: 'View' }, { key: 'updateStatus', label: 'Update Status' }] },
+    { key: 'customers',  label: 'Customers',  actions: [{ key: 'view', label: 'View' }, { key: 'edit', label: 'Edit' }, { key: 'delete', label: 'Delete' }] },
+];
+
+const DEFAULT_PERMISSIONS: Permissions = {
+    dashboard:  { view: true },
+    products:   { view: true,  create: false, edit: false, delete: false },
+    categories: { view: true,  create: false, edit: false, delete: false },
+    orders:     { view: true,  updateStatus: false },
+    customers:  { view: true,  edit: false, delete: false },
+    staff:      { view: false, create: false, edit: false, delete: false },
+    settings:   { view: false, edit: false },
+};
+
 interface StaffFormProps {
     form: any;
     setForm: React.Dispatch<React.SetStateAction<any>>;
@@ -42,7 +71,21 @@ const StaffForm: React.FC<StaffFormProps> = ({ form, setForm, isSaving, isEdit =
     const [tempImage, setTempImage] = useState<File | null>(null);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [showPassword, setShowPassword] = useState(false);
+    const [changePassword, setChangePassword] = useState(false);
+    const { user } = useAuth();
+    const isSuperAdmin = user?.role === 'superadmin';
     const avatarSrc = form.profilePicture ? URL.createObjectURL(form.profilePicture) : form.existingProfilePicture || null;
+
+    // Ensure permissions are initialized when form is first rendered
+    React.useEffect(() => {
+        if (isSuperAdmin && !form.permissions) {
+            setForm((p: any) => ({ ...p, permissions: DEFAULT_PERMISSIONS }));
+        }
+    }, []);
+
+    // For new staff: use form.password; for edit: use form.newPassword
+    const pwd = isEdit ? (form.newPassword || '') : (form.password || '');
+    const pwdAllValid = pwdRules.every(r => r.test(pwd));
 
     const validateField = (field: string, value: string) => {
         let error = '';
@@ -59,10 +102,9 @@ const StaffForm: React.FC<StaffFormProps> = ({ form, setForm, isSaving, isEdit =
             if (!cleanPhone || !/^[0-9]{10}$/.test(cleanPhone)) {
                 error = 'Phone number must be exactly 10 digits.';
             }
-        } else if (field === 'password' && !isEdit) {
-            const meetsAll = value.length >= 6 && !/\s/.test(value) && /[A-Z]/.test(value) && /[a-z]/.test(value) && /[0-9]/.test(value) && /[!@#$%^&*(),.?":{}|<>]/.test(value);
-            if (!meetsAll) {
-                error = 'Please ensure your password meets all requirements.';
+        } else if (field === 'newPassword' && isEdit && changePassword) {
+            if (!pwdRules.every(r => r.test(value))) {
+                error = 'Please meet all password requirements.';
             }
         } else if (field === 'dateOfBirth') {
             if (value && new Date(value) > new Date()) {
@@ -100,12 +142,8 @@ const StaffForm: React.FC<StaffFormProps> = ({ form, setForm, isSaving, isEdit =
         if (form.dateOfBirth && new Date(form.dateOfBirth) > new Date()) {
             newErrors.dateOfBirth = 'Date of birth cannot be in the future.';
         }
-        if (!isEdit) {
-            const pwd = form.password || '';
-            const meetsAll = pwd.length >= 6 && !/\s/.test(pwd) && pwd.length > 0 && /[A-Z]/.test(pwd) && /[a-z]/.test(pwd) && /[0-9]/.test(pwd) && /[!@#$%^&*(),.?":{}|<>]/.test(pwd);
-            if (!meetsAll) {
-                newErrors.password = 'Please ensure your password meets all requirements.';
-            }
+        if (isEdit && changePassword) {
+            if (!pwdAllValid) newErrors.newPassword = 'Please meet all password requirements.';
         }
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
@@ -136,9 +174,14 @@ const StaffForm: React.FC<StaffFormProps> = ({ form, setForm, isSaving, isEdit =
                     exit={{ opacity: 0, scale: 0.85, y: 20 }}
                     transition={{ type: 'spring', stiffness: 400, damping: 30 }}
                     onClick={e => e.stopPropagation()}
-                    style={{ background: '#fff', borderRadius: '24px', padding: '32px', width: '100%', maxWidth: '500px', border: '1px solid #f0f0f2' }}
+                    style={{
+                        background: '#fff', borderRadius: '24px', width: '100%', maxWidth: '680px',
+                        border: '1px solid #f0f0f2', display: 'flex', flexDirection: 'column',
+                        maxHeight: '90vh', overflow: 'hidden',
+                    }}
                 >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                    {/* Fixed Header */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '24px 28px 20px', borderBottom: '1px solid #f0f0f2', flexShrink: 0 }}>
                         <div>
                             <h2 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#1a1a1a', letterSpacing: '-0.5px', margin: 0 }}>
                                 {isEdit ? 'Edit Staff Member' : 'New Staff Member'}
@@ -147,12 +190,14 @@ const StaffForm: React.FC<StaffFormProps> = ({ form, setForm, isSaving, isEdit =
                                 {isEdit ? 'Update staff-level access account' : 'Create an admin account'}
                             </p>
                         </div>
-                        <button type="button" onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '8px', color: '#999', transition: 'color 0.2s' }} onMouseEnter={e => e.currentTarget.style.color = '#1a1a1a'} onMouseLeave={e => e.currentTarget.style.color = '#999'}>
+                        <button type="button" onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '8px', color: '#999', transition: 'color 0.2s', flexShrink: 0 }} onMouseEnter={e => e.currentTarget.style.color = '#1a1a1a'} onMouseLeave={e => e.currentTarget.style.color = '#999'}>
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                         </button>
                     </div>
 
-                    <form onSubmit={handleFormSubmit} noValidate>
+                    <form onSubmit={handleFormSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+                        {/* Scrollable Body */}
+                        <div style={{ overflowY: 'auto', flex: 1, padding: '24px 28px' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                             {/* Circular Avatar Uploader */}
                             {isEdit && (
@@ -260,75 +305,159 @@ const StaffForm: React.FC<StaffFormProps> = ({ form, setForm, isSaving, isEdit =
                                     {errors.gender && <span style={errorStyle}>{errors.gender}</span>}
                                 </div>
                             </div>
-                            {!isEdit && (
-                                <div style={{ position: 'relative' }}>
-                                    <label style={labelStyle}>Password *</label>
-                                    <div style={{ position: 'relative' }}>
-                                        <input 
-                                            type={showPassword ? "text" : "password"} 
-                                            style={{ ...inputStyle, paddingRight: '44px' }} 
-                                            value={form.password || ''} 
-                                            onChange={e => { const val = e.target.value; setForm((p: any) => ({ ...p, password: val })); validateField('password', val); }} 
-                                            onFocus={focusHandlers.onFocus} 
-                                            onBlur={handleBlur('password')} 
-                                        />
-                                        <button
-                                            type="button"
-                                            style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#999', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                            onClick={() => setShowPassword(!showPassword)}
-                                        >
-                                            {showPassword ? (
-                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
-                                            ) : (
-                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                                            )}
-                                        </button>
+                            {/* Permissions section — superadmin only */}
+                            {isSuperAdmin && (
+                                <div style={{ borderTop: '1px solid #f0f0f2', paddingTop: '20px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                                        <div>
+                                            <p style={{ ...labelStyle, marginBottom: '2px' }}>Permissions</p>
+                                            <p style={{ fontSize: '0.78rem', color: '#bbb', fontWeight: 500, margin: 0 }}>Control what this staff member can access</p>
+                                        </div>
                                     </div>
-                                    <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                        {[
-                                            { id: 'length', text: 'At least 6 characters', isValid: (form.password || '').length >= 6 },
-                                            { id: 'noSpaces', text: 'No spaces', isValid: !/\s/.test(form.password || '') && (form.password || '').length > 0 },
-                                            { id: 'uppercase', text: 'One uppercase letter', isValid: /[A-Z]/.test(form.password || '') },
-                                            { id: 'lowercase', text: 'One lowercase letter', isValid: /[a-z]/.test(form.password || '') },
-                                            { id: 'number', text: 'One number', isValid: /[0-9]/.test(form.password || '') },
-                                            { id: 'special', text: 'One special character', isValid: /[!@#$%^&*(),.?":{}|<>]/.test(form.password || '') }
-                                        ].map(req => (
-                                            <div key={req.id} style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', color: req.isValid ? '#2ecc71' : '#aaa', fontWeight: req.isValid ? 600 : 500, transition: 'color 0.3s' }}>
-                                                {req.isValid ? (
-                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '8px' }}><polyline points="20 6 9 17 4 12"></polyline></svg>
-                                                ) : (
-                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '8px' }}><circle cx="12" cy="12" r="10"></circle></svg>
-                                                )}
-                                                {req.text}
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                        {permissionModules.map(mod => (
+                                            <div key={mod.key} style={{ background: '#fafafa', borderRadius: '12px', border: '1.5px solid #f0f0f2', padding: '12px 16px' }}>
+                                                <p style={{ fontSize: '0.78rem', fontWeight: 800, color: '#555', textTransform: 'uppercase', letterSpacing: '0.6px', margin: '0 0 10px 0' }}>{mod.label}</p>
+                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '8px' }}>
+                                                    {mod.actions.map(action => {
+                                                        const checked = !!(form.permissions?.[mod.key] as any)?.[action.key];
+                                                        return (
+                                                            <label key={action.key} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600, color: checked ? '#1a1a1a' : '#aaa', transition: 'color 0.2s' }}>
+                                                                <div
+                                                                    onClick={() => {
+                                                                        setForm((p: any) => ({
+                                                                            ...p,
+                                                                            permissions: {
+                                                                                ...p.permissions,
+                                                                                [mod.key]: {
+                                                                                    ...(p.permissions?.[mod.key] || {}),
+                                                                                    [action.key]: !checked,
+                                                                                }
+                                                                            }
+                                                                        }));
+                                                                    }}
+                                                                    style={{
+                                                                        width: '18px', height: '18px', borderRadius: '5px', flexShrink: 0,
+                                                                        border: `2px solid ${checked ? 'var(--prime-orange)' : '#ddd'}`,
+                                                                        background: checked ? 'var(--prime-orange)' : '#fff',
+                                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                                        transition: 'all 0.15s', cursor: 'pointer',
+                                                                    }}
+                                                                >
+                                                                    {checked && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>}
+                                                                </div>
+                                                                {action.label}
+                                                            </label>
+                                                        );
+                                                    })}
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
                                 </div>
                             )}
-                            <div style={{ paddingTop: '16px', borderTop: '1px solid #f0f0f2', display: 'flex', gap: '12px' }}>
-                                <button type="button" onClick={onBack} disabled={isSaving} style={{ flex: 1, padding: '14px', borderRadius: '14px', border: '1.5px solid #e8e8e8', background: '#fff', fontWeight: 700, fontSize: '0.92rem', color: '#555', cursor: 'pointer' }}>
-                                    Cancel
-                                </button>
-                                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '14px', borderRadius: '14px', border: 'none', background: 'var(--prime-orange)', color: '#fff', fontWeight: 800, fontSize: '0.92rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                        {isEdit ? (
-                                            <>
-                                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                                                <polyline points="17 21 17 13 7 13 7 21" />
-                                                <polyline points="7 3 7 8 15 8" />
-                                            </>
-                                        ) : (
-                                            <>
-                                                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                                                <circle cx="8.5" cy="7" r="4" />
-                                                <line x1="20" y1="8" x2="20" y2="14" />
-                                                <line x1="23" y1="11" x2="17" y2="11" />
-                                            </>
+                            {/* New staff: password setup info */}
+                            {!isEdit && (
+                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '14px', padding: '16px 18px' }}>
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: '1px' }}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                                    <div>
+                                        <p style={{ margin: '0 0 4px', fontSize: '0.82rem', fontWeight: 800, color: '#15803d' }}>Password setup via email</p>
+                                        <p style={{ margin: 0, fontSize: '0.8rem', color: '#166534', lineHeight: 1.5 }}>
+                                            A secure setup link will be emailed to the staff member. They'll set their own password — no password is shared here.
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Edit staff: change password toggle */}
+                            {isEdit && (
+                                <div>
+                                    <button
+                                        type="button"
+                                        onClick={() => { setChangePassword(v => !v); setForm((p: any) => ({ ...p, newPassword: '' })); }}
+                                        style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: '1.5px solid #f0f0f2', borderRadius: '12px', padding: '10px 16px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 700, color: changePassword ? 'var(--prime-orange)' : '#555', transition: 'all 0.2s' }}
+                                    >
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                                        {changePassword ? 'Cancel password change' : 'Change password'}
+                                    </button>
+                                    <AnimatePresence>
+                                        {changePassword && (
+                                            <motion.div
+                                                initial={{ opacity: 0, height: 0 }}
+                                                animate={{ opacity: 1, height: 'auto' }}
+                                                exit={{ opacity: 0, height: 0 }}
+                                                transition={{ duration: 0.25 }}
+                                                style={{ overflow: 'hidden' }}
+                                            >
+                                                <div style={{ paddingTop: '16px' }}>
+                                                    <label style={labelStyle}>New Password *</label>
+                                                    <div style={{ position: 'relative' }}>
+                                                        <input
+                                                            type={showPassword ? 'text' : 'password'}
+                                                            style={{ ...inputStyle, paddingRight: '44px' }}
+                                                            value={form.newPassword || ''}
+                                                            onChange={e => { const val = e.target.value; setForm((p: any) => ({ ...p, newPassword: val })); validateField('newPassword', val); }}
+                                                            onFocus={focusHandlers.onFocus}
+                                                            onBlur={handleBlur('newPassword')}
+                                                            placeholder="Enter new password"
+                                                        />
+                                                        <button type="button" style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#999', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowPassword(v => !v)}>
+                                                            {showPassword ? (
+                                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+                                                            ) : (
+                                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                                            )}
+                                                        </button>
+                                                    </div>
+                                                    <div style={{ marginTop: '12px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 16px' }}>
+                                                        {pwdRules.map(rule => {
+                                                            const isValid = rule.test(form.newPassword || '');
+                                                            return (
+                                                                <div key={rule.id} style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', color: isValid ? '#10b981' : '#aaa', fontWeight: isValid ? 600 : 500, transition: 'color 0.3s' }}>
+                                                                    {isValid ? (
+                                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', flexShrink: 0 }}><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                                                    ) : (
+                                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', flexShrink: 0 }}><circle cx="12" cy="12" r="10"></circle></svg>
+                                                                    )}
+                                                                    {rule.text}
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                    {errors.newPassword && <span style={errorStyle}>{errors.newPassword}</span>}
+                                                </div>
+                                            </motion.div>
                                         )}
-                                    </svg>
-                                    {isSaving ? (isEdit ? 'Saving...' : 'Creating...') : (isEdit ? 'Save Changes' : 'Create Staff')}
-                                </button>
-                            </div>
+                                    </AnimatePresence>
+                                </div>
+                            )}
+                        </div>
+                        </div>
+
+                        {/* Fixed Footer */}
+                        <div style={{ padding: '16px 28px 24px', borderTop: '1px solid #f0f0f2', display: 'flex', gap: '12px', flexShrink: 0 }}>
+                            <button type="button" onClick={onBack} disabled={isSaving} style={{ flex: 1, padding: '14px', borderRadius: '14px', border: '1.5px solid #e8e8e8', background: '#fff', fontWeight: 700, fontSize: '0.92rem', color: '#555', cursor: 'pointer' }}>
+                                Cancel
+                            </button>
+                            <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '14px', borderRadius: '14px', border: 'none', background: 'var(--prime-orange)', color: '#fff', fontWeight: 800, fontSize: '0.92rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    {isEdit ? (
+                                        <>
+                                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                                            <polyline points="17 21 17 13 7 13 7 21" />
+                                            <polyline points="7 3 7 8 15 8" />
+                                        </>
+                                    ) : (
+                                        <>
+                                            <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                                            <circle cx="8.5" cy="7" r="4" />
+                                            <line x1="20" y1="8" x2="20" y2="14" />
+                                            <line x1="23" y1="11" x2="17" y2="11" />
+                                        </>
+                                    )}
+                                </svg>
+                                {isSaving ? (isEdit ? 'Saving...' : 'Creating...') : (isEdit ? 'Save Changes' : 'Create Staff')}
+                            </button>
                         </div>
                     </form>
                 </motion.div>

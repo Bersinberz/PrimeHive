@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import type { Category } from '../../../services/admin/categoryService';
+import { usePermission } from '../../../hooks/usePermission';
 
 interface CategoryHeaderProps {
   categories: Category[];
@@ -10,6 +11,7 @@ interface CategoryHeaderProps {
 }
 
 const CategoryHeader: React.FC<CategoryHeaderProps> = ({ categories, searchQuery, onSearchChange, onAddClick }) => {
+  const canCreate = usePermission('categories', 'create');
   const total = categories.length;
   const emptyCategories = categories.filter(c => c.productCount === 0).length;
 
@@ -30,7 +32,7 @@ const CategoryHeader: React.FC<CategoryHeaderProps> = ({ categories, searchQuery
             Organize your catalog with collections
           </p>
         </div>
-        <button className="new-product-btn" onClick={onAddClick}>
+        <button className="new-product-btn" onClick={onAddClick} style={{ display: canCreate ? undefined : 'none' }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
             <line x1="12" y1="5" x2="12" y2="19" />
             <line x1="5" y1="12" x2="19" y2="12" />

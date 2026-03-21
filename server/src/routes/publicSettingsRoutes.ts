@@ -10,12 +10,16 @@ const router = express.Router();
  */
 router.get("/public", async (req, res) => {
     try {
-        let settings = await Settings.findOne().select("storeName");
+        let settings = await Settings.findOne().select("storeName supportEmail supportPhone storeLocation freeShippingThreshold");
         if (!settings) {
             settings = await Settings.create({});
         }
         res.status(200).json({
             storeName: settings.storeName,
+            supportEmail: settings.supportEmail,
+            supportPhone: settings.supportPhone,
+            storeLocation: settings.storeLocation,
+            freeShippingThreshold: settings.freeShippingThreshold,
         });
     } catch (error: any) {
         res.status(500).json({

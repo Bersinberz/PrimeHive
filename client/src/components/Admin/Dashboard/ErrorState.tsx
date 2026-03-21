@@ -19,8 +19,8 @@ const DashboardErrorState: React.FC<DashboardErrorStateProps> = ({
       style={{
         minHeight: '400px',
         backgroundColor: '#fff',
-        borderRadius: '16px',
-        border: '1px dashed #cbd5e1',
+        borderRadius: '20px',
+        border: '1px solid #f0f0f2',
         padding: '40px'
       }}
     >
@@ -39,10 +39,10 @@ const DashboardErrorState: React.FC<DashboardErrorStateProps> = ({
       </motion.div>
 
       {/* Text Content */}
-      <h4 className="fw-bolder text-dark mb-2" style={{ letterSpacing: '-0.5px' }}>
-        Oops! Something went wrong
+      <h4 style={{ fontWeight: 900, color: '#1a1a1a', letterSpacing: '-0.5px', marginBottom: '8px' }}>
+        Something went wrong
       </h4>
-      <p className="text-muted mb-4" style={{ maxWidth: '400px', fontSize: '0.95rem', lineHeight: '1.6' }}>
+      <p style={{ color: '#999', maxWidth: '400px', fontSize: '0.9rem', lineHeight: '1.6', marginBottom: '24px' }}>
         {message}
       </p>
 
@@ -52,15 +52,11 @@ const DashboardErrorState: React.FC<DashboardErrorStateProps> = ({
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={onRetry}
-          className="btn px-4 py-2 fw-bold shadow-sm"
           style={{
-            backgroundColor: 'var(--prime-orange, #ff8c42)',
-            color: '#fff',
-            borderRadius: '10px',
-            border: 'none',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
+            background: 'var(--prime-orange)',
+            color: '#fff', borderRadius: '12px', border: 'none',
+            padding: '12px 24px', fontWeight: 800, fontSize: '0.9rem',
+            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px',
           }}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

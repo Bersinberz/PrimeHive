@@ -4,10 +4,12 @@ import {
   getCustomers,
   updateCustomerStatus,
   deleteCustomer,
+  hardDeleteCustomer,
+  revokeCustomerDeletion,
   type Customer,
 } from '../../services/admin/customerService';
+import { useToast } from '../../context/ToastContext';
 import PrimeLoader from '../../components/PrimeLoader';
-import ToastNotification from '../../components/Admin/ToastNotification';
 
 import CustomerHeader from '../../components/Admin/Customer/CustomerHeader';
 import CustomerList from '../../components/Admin/Customer/CustomerList';
@@ -24,16 +26,10 @@ const CustomerManagement: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [toast, setToast] = useState<{ type: 'success' | 'error'; title: string; message: string } | null>(null);
 
-  const [form, setForm] = useState<{ name: string; email: string; phone: string; dateOfBirth: string; gender: string; profilePicture: File | null; existingProfilePicture?: string }>({ name: '', email: '', phone: '', dateOfBirth: '', gender: '', profilePicture: null });
+  const [form, setForm] = useState<{ name: string; email: string; phone: string; dateOfBirth: string; gender: string; profilePicture: File | null; existingProfilePicture?: string; newPassword?: string }>({ name: '', email: '', phone: '', dateOfBirth: '', gender: '', profilePicture: null, newPassword: '' });
 
-  useEffect(() => {
-    if (toast) {
-      const timer = setTimeout(() => setToast(null), 4000);
-      return () => clearTimeout(timer);
-    }
-  }, [toast]);
+  const { showToast } = useToast();
 
   useEffect(() => {
     loadCustomers();
@@ -44,7 +40,7 @@ const CustomerManagement: React.FC = () => {
       const data = await getCustomers();
       setCustomers(data);
     } catch {
-      setToast({ type: 'error', title: 'Load Failed', message: 'Could not load customers.' });
+      showToast({ type: 'error', title: 'Couldn\'t load customers', message: 'Something went wrong. Please refresh and try again.' });
     } finally {
       setIsLoading(false);
     }
@@ -58,10 +54,10 @@ const CustomerManagement: React.FC = () => {
       if (selectedCustomer?._id === customerId) {
         setSelectedCustomer(updated);
       }
-      const label = status === 'active' ? 'Activated' : status === 'inactive' ? 'Deactivated' : 'Banned';
-      setToast({ type: 'success', title: label, message: `Customer status updated to ${status}.` });
+      const label = status === 'active' ? 'Account activated' : 'Account deactivated';
+      showToast({ type: 'success', title: label, message: `The customer's account is now ${status}.` });
     } catch (err: any) {
-      setToast({ type: 'error', title: 'Failed', message: err?.message || 'Could not update status.' });
+      showToast({ type: 'error', title: 'Couldn\'t update status', message: err?.message || 'Something went wrong. Please try again.' });
     } finally {
       setIsSaving(false);
     }
@@ -71,14 +67,43 @@ const CustomerManagement: React.FC = () => {
     setIsSaving(true);
     try {
       await deleteCustomer(customerId);
-      setCustomers(prev => prev.filter(c => c._id !== customerId));
+      const now = new Date().toISOString();
+      setCustomers(prev => prev.map(c => c._id === customerId ? { ...c, status: 'deleted' as const, deletedAt: now } : c));
       if (selectedCustomer?._id === customerId) {
-        setView('list');
-        setSelectedCustomer(null);
+        setSelectedCustomer(prev => prev ? { ...prev, status: 'deleted' as const, deletedAt: now } : null);
       }
-      setToast({ type: 'success', title: 'Deleted', message: 'Customer removed permanently.' });
+      showToast({ type: 'success', title: 'Customer removed', message: 'The customer account has been scheduled for deletion in 30 days.' });
     } catch (err: any) {
-      setToast({ type: 'error', title: 'Failed', message: err?.message || 'Could not delete customer.' });
+      showToast({ type: 'error', title: 'Couldn\'t delete', message: err?.message || 'Something went wrong. Please try again.' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleHardDelete = async (customerId: string) => {
+    setIsSaving(true);
+    try {
+      await hardDeleteCustomer(customerId);
+      setCustomers(prev => prev.filter(c => c._id !== customerId));
+      setView('list');
+      setSelectedCustomer(null);
+      showToast({ type: 'success', title: 'Permanently deleted', message: 'The customer account has been erased from the system.' });
+    } catch (err: any) {
+      showToast({ type: 'error', title: 'Couldn\'t delete', message: err?.message || 'Something went wrong. Please try again.' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleRevokeDelete = async (customerId: string) => {
+    setIsSaving(true);
+    try {
+      const restored = await revokeCustomerDeletion(customerId);
+      setCustomers(prev => prev.map(c => c._id === customerId ? restored : c));
+      setSelectedCustomer(restored);
+      showToast({ type: 'success', title: 'Account restored', message: 'The customer account has been reactivated.' });
+    } catch (err: any) {
+      showToast({ type: 'error', title: 'Couldn\'t restore', message: err?.message || 'Something went wrong. Please try again.' });
     } finally {
       setIsSaving(false);
     }
@@ -96,15 +121,16 @@ const CustomerManagement: React.FC = () => {
         formData.append('phone', form.phone);
         if (form.dateOfBirth) formData.append('dateOfBirth', form.dateOfBirth);
         if (form.gender) formData.append('gender', form.gender);
+        if (form.newPassword) formData.append('password', form.newPassword);
         if (form.profilePicture) formData.append('profilePicture', form.profilePicture);
         
         const updated = await updateCustomer(selectedCustomer._id, formData);
         setCustomers(prev => prev.map(c => c._id === updated._id ? updated : c));
         setSelectedCustomer(updated);
         setIsEditModalOpen(false);
-        setToast({ type: 'success', title: 'Updated', message: 'Customer details updated successfully.' });
+        showToast({ type: 'success', title: 'Changes saved', message: 'Customer details have been updated.' });
       } catch (err: any) {
-        setToast({ type: 'error', title: 'Failed', message: err?.response?.data?.message || err?.message || 'Could not update customer.' });
+        showToast({ type: 'error', title: 'Couldn\'t save changes', message: err?.response?.data?.message || err?.message || 'Something went wrong. Please try again.' });
       } finally {
         setIsSaving(false);
       }
@@ -134,11 +160,10 @@ const CustomerManagement: React.FC = () => {
       animate={{ opacity: 1 }}
       style={{
         maxWidth: '1400px', minHeight: '80vh', margin: '0 auto',
-        position: 'relative', paddingBottom: '40px', display: 'flex', flexDirection: 'column'
+        paddingBottom: '40px', display: 'flex', flexDirection: 'column'
       }}
     >
       <PrimeLoader isLoading={isLoading || isSaving} />
-      <ToastNotification toast={toast} onClose={() => setToast(null)} />
 
       <CustomerHeader
         view={view}
@@ -168,7 +193,9 @@ const CustomerManagement: React.FC = () => {
                 customer={selectedCustomer} 
                 isSaving={isSaving} 
                 onStatusChange={handleStatusChange} 
-                onDelete={handleDelete} 
+                onDelete={handleDelete}
+                onHardDelete={handleHardDelete}
+                onRevokeDelete={handleRevokeDelete}
                 onEdit={() => {
                   setForm({ 
                     name: selectedCustomer.name, 
@@ -177,7 +204,8 @@ const CustomerManagement: React.FC = () => {
                     dateOfBirth: selectedCustomer.dateOfBirth ? new Date(selectedCustomer.dateOfBirth).toISOString().split('T')[0] : '',
                     gender: selectedCustomer.gender || '',
                     profilePicture: null,
-                    existingProfilePicture: selectedCustomer.profilePicture
+                    existingProfilePicture: selectedCustomer.profilePicture,
+                    newPassword: ''
                   });
                   setIsEditModalOpen(true);
                 }}
@@ -187,7 +215,7 @@ const CustomerManagement: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* ── EDIT CUSTOMER MODAL ── */}
+      {/* ── EDIT CUSTOMER MODAL ── rendered outside motion wrapper so overlay covers full viewport ── */}
       {isEditModalOpen && selectedCustomer && (
           <CustomerForm
               form={form}

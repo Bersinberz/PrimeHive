@@ -5,15 +5,23 @@ dotenv.config({
       ? ".env.production"
       : ".env.development"
 });
+
+// Validate env vars before anything else (#19)
+import { validateEnv } from "./utils/envValidation";
+validateEnv();
+
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
 import rateLimit from "express-rate-limit";
 import cookieParser from "cookie-parser";
+import morgan from "morgan";
 import logger from "./config/logger";
+import { connectRedis, disconnectRedis } from "./config/redis";
 
 import { connectDB } from "./config/db";
+import { startPurgeJob } from "./jobs/purgeDeletedUsers";
 import authRoutes from "./routes/authRoutes";
 import adminProductRoutes from "./routes/admin/productRoutes";
 import adminCategoryRoutes from "./routes/admin/categoryRoutes";
@@ -22,24 +30,27 @@ import adminCustomerRoutes from "./routes/admin/customerRoutes";
 import adminStaffRoutes from "./routes/admin/staffRoutes";
 import adminOrderRoutes from "./routes/admin/orderRoutes";
 import adminStatsRoutes from "./routes/admin/statsRoutes";
+import storeProfileRoutes from "./routes/admin/storeProfileRoutes";
+import publicSettingsRoutes from "./routes/publicSettingsRoutes";
+import storefrontProductRoutes from "./routes/storefront/productRoutes";
+import storefrontCategoryRoutes from "./routes/storefront/categoryRoutes";
+import storefrontCartRoutes from "./routes/storefront/cartRoutes";
+import storefrontOrderRoutes from "./routes/storefront/orderRoutes";
 
-// ==========================================
-// Load Environment Variables
-// ==========================================
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 // ==========================================
-// NoSQL Injection Sanitizer (Express 5 compatible)
+// NoSQL Injection Sanitizer — body + query (#2)
 // ==========================================
 
-const sanitize = (obj: any): any => {
+const sanitizeObject = (obj: Record<string, unknown>): Record<string, unknown> => {
   if (typeof obj !== "object" || obj === null) return obj;
   for (const key of Object.keys(obj)) {
     if (key.startsWith("$") || key.includes(".")) {
       delete obj[key];
-    } else {
-      obj[key] = sanitize(obj[key]);
+    } else if (typeof obj[key] === "object" && obj[key] !== null) {
+      obj[key] = sanitizeObject(obj[key] as Record<string, unknown>);
     }
   }
   return obj;
@@ -53,7 +64,16 @@ app.use(helmet());
 app.use(compression());
 app.use(cookieParser());
 
-// CORS — supports multiple origins via comma-separated CLIENT_URL (#23)
+// HTTP request logging (#16)
+if (process.env.NODE_ENV !== "production") {
+  app.use(morgan("dev"));
+} else {
+  app.use(morgan("combined", {
+    stream: { write: (msg) => logger.info(msg.trim()) }
+  }));
+}
+
+// CORS
 const allowedOrigins = (process.env.CLIENT_URL || "")
   .split(",")
   .map((origin) => origin.trim())
@@ -62,7 +82,6 @@ const allowedOrigins = (process.env.CLIENT_URL || "")
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (mobile apps, curl, etc.)
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
@@ -76,14 +95,23 @@ app.use(
 app.use(express.json({ limit: "10kb" }));
 app.use(express.urlencoded({ extended: true }));
 
-// Sanitize req.body against NoSQL injection (#24)
+// Sanitize req.body and req.query against NoSQL injection (#2)
 app.use((req: Request, _res: Response, next: NextFunction) => {
-  if (req.body) req.body = sanitize(req.body);
+  if (req.body) req.body = sanitizeObject(req.body);
+  if (req.query) {
+    // Sanitize in-place — req.query is a getter in Express 5, cannot be reassigned
+    for (const key of Object.keys(req.query)) {
+      const val = req.query[key];
+      if (typeof val === "string" && (val.startsWith("$") || val.includes("."))) {
+        delete req.query[key];
+      }
+    }
+  }
   next();
 });
 
 // ==========================================
-// Granular Rate Limiters (#24)
+// Rate Limiters
 // ==========================================
 
 const authLimiter = rateLimit({
@@ -104,10 +132,8 @@ const statsLimiter = rateLimit({
   message: "Too many dashboard requests. Please try again later."
 });
 
-import publicSettingsRoutes from "./routes/publicSettingsRoutes";
-
 // ==========================================
-// Routes (API v1) (#21)
+// Routes (API v1)
 // ==========================================
 
 app.use("/api/v1/settings", publicSettingsRoutes);
@@ -119,12 +145,28 @@ app.use("/api/v1/admin/customers", adminLimiter, adminCustomerRoutes);
 app.use("/api/v1/admin/staff", adminLimiter, adminStaffRoutes);
 app.use("/api/v1/admin/orders", adminLimiter, adminOrderRoutes);
 app.use("/api/v1/admin/stats", statsLimiter, adminStatsRoutes);
+app.use("/api/v1/admin/store-profile", adminLimiter, storeProfileRoutes);
+
+// ==========================================
+// Storefront Routes (Public + User)
+// ==========================================
+
+const storefrontLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 300,
+  message: "Too many requests. Please try again later."
+});
+
+app.use("/api/v1/products", storefrontLimiter, storefrontProductRoutes);
+app.use("/api/v1/categories", storefrontLimiter, storefrontCategoryRoutes);
+app.use("/api/v1/cart", storefrontLimiter, storefrontCartRoutes);
+app.use("/api/v1/orders", storefrontLimiter, storefrontOrderRoutes);
 
 // ==========================================
 // Health Route
 // ==========================================
 
-app.get("/api/v1/health", (req, res) => {
+app.get("/api/v1/health", (_req, res) => {
   res.status(200).json({
     status: "OK",
     environment: process.env.NODE_ENV,
@@ -136,17 +178,15 @@ app.get("/api/v1/health", (req, res) => {
 // 404 Handler
 // ==========================================
 
-app.use((req: Request, res: Response) => {
-  res.status(404).json({
-    message: "Route not found"
-  });
+app.use((_req: Request, res: Response) => {
+  res.status(404).json({ message: "Route not found" });
 });
 
 // ==========================================
-// Global Error Handler (#14)
+// Global Error Handler
 // ==========================================
 
-app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
+app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   logger.error("Unhandled Error:", err);
   res.status(500).json({
     message:
@@ -157,12 +197,16 @@ app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
 });
 
 // ==========================================
-// Start Server AFTER DB Connects
+// Start Server
 // ==========================================
 
 const startServer = async () => {
   try {
+    // Connect Redis (non-blocking — app works without it but logs warning)
+    await connectRedis();
+
     const dbName = await connectDB();
+        startPurgeJob();
 
     const server = app.listen(PORT, () => {
       logger.info(`
@@ -176,10 +220,10 @@ Database    : ${dbName}
 `);
     });
 
-    // Graceful shutdown for both SIGTERM and SIGINT (#15)
     const gracefulShutdown = (signal: string) => {
       logger.info(`${signal} received. Shutting down gracefully...`);
-      server.close(() => {
+      server.close(async () => {
+        await disconnectRedis();
         logger.info("Server closed.");
         process.exit(0);
       });
@@ -187,12 +231,13 @@ Database    : ${dbName}
 
     process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
     process.on("SIGINT", () => gracefulShutdown("SIGINT"));
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
     logger.error(`
 ====================================================
-❌ PrimeHive Server Failed to Start
+PrimeHive Server Failed to Start
 ----------------------------------------------------
-${error.message}
+${msg}
 ====================================================
 `);
     process.exit(1);

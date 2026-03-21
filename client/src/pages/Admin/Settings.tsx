@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getSettings, updateSettings, changePassword } from '../../services/admin/settingsService';
+import { useToast } from '../../context/ToastContext';
 import PrimeLoader from '../../components/PrimeLoader';
-import ToastNotification from '../../components/Admin/ToastNotification';
 
 import SettingsHeader from '../../components/Admin/Settings/SettingsHeader';
 import SettingsNav, { type SettingsSection } from '../../components/Admin/Settings/SettingsNav';
@@ -15,11 +15,13 @@ const Settings: React.FC = () => {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [toast, setToast] = useState<{ type: 'success' | 'error'; title: string; message: string } | null>(null);
+  const { showToast } = useToast();
 
   const [form, setForm] = useState({
     storeName: '',
     supportEmail: '',
+    supportPhone: '',
+    storeLocation: '',
     currency: 'INR',
     timezone: 'Asia/Kolkata',
     orderIdPrefix: 'ORD-',
@@ -30,19 +32,14 @@ const Settings: React.FC = () => {
   });
 
   useEffect(() => {
-    if (toast) {
-      const timer = setTimeout(() => setToast(null), 4000);
-      return () => clearTimeout(timer);
-    }
-  }, [toast]);
-
-  useEffect(() => {
     const load = async () => {
       try {
         const data = await getSettings();
         setForm({
           storeName: data.storeName || '',
           supportEmail: data.supportEmail || '',
+          supportPhone: data.supportPhone || '',
+          storeLocation: data.storeLocation || '',
           currency: data.currency || 'INR',
           timezone: data.timezone || 'Asia/Kolkata',
           orderIdPrefix: data.orderIdPrefix || 'ORD-',
@@ -52,7 +49,7 @@ const Settings: React.FC = () => {
           taxInclusive: data.taxInclusive ?? true,
         });
       } catch {
-        setToast({ type: 'error', title: 'Load Failed', message: 'Could not load store settings.' });
+        showToast({ type: 'error', title: 'Load Failed', message: 'Could not load store settings.' });
       } finally {
         setIsLoading(false);
       }
@@ -69,6 +66,12 @@ const Settings: React.FC = () => {
       case 'supportEmail':
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!value || !emailRegex.test(String(value))) error = 'Please enter a valid email address.';
+        break;
+      case 'supportPhone':
+        if (value && String(value).trim().length < 5) error = 'Please enter a valid phone number.';
+        break;
+      case 'storeLocation':
+        if (value && String(value).trim().length < 5) error = 'Please enter a valid location.';
         break;
       case 'taxRate':
         if (value === '' || isNaN(Number(value)) || Number(value) < 0 || Number(value) > 100) error = 'Tax rate must be between 0 and 100.';
@@ -115,7 +118,7 @@ const Settings: React.FC = () => {
 
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
-    const fields = ['storeName', 'supportEmail', 'taxRate', 'standardShippingRate', 'freeShippingThreshold'];
+    const fields = ['storeName', 'supportEmail', 'supportPhone', 'storeLocation', 'taxRate', 'standardShippingRate', 'freeShippingThreshold'];
     fields.forEach(f => {
       const err = validateField(f, (form as any)[f]);
       if (err) errors[f] = err;
@@ -126,13 +129,13 @@ const Settings: React.FC = () => {
 
   const handleSave = async () => {
     if (!validateForm()) {
-      setToast({ type: 'error', title: 'Validation Error', message: 'Please correct the highlighted errors.' });
+      showToast({ type: 'error', title: 'Validation Error', message: 'Please correct the highlighted errors.' });
       return;
     }
     setIsSaving(true);
     try {
       await updateSettings(form);
-      setToast({ type: 'success', title: 'Saved', message: 'Store settings updated successfully!' });
+      showToast({ type: 'success', title: 'Saved', message: 'Store settings updated successfully!' });
     } catch (err: any) {
       if (err?.status === 400 && err?.errors) {
         const backendErrors: Record<string, string> = {};
@@ -141,7 +144,7 @@ const Settings: React.FC = () => {
         });
         setFormErrors(backendErrors);
       }
-      setToast({ type: 'error', title: 'Save Failed', message: err?.message || 'Could not save settings.' });
+      showToast({ type: 'error', title: 'Save Failed', message: err?.message || 'Could not save settings.' });
     } finally {
       setIsSaving(false);
     }
@@ -151,9 +154,9 @@ const Settings: React.FC = () => {
     setIsSaving(true);
     try {
       await changePassword(currentPassword, newPassword);
-      setToast({ type: 'success', title: 'Updated', message: 'Password changed successfully!' });
+      showToast({ type: 'success', title: 'Updated', message: 'Password changed successfully!' });
     } catch (err: any) {
-      setToast({ type: 'error', title: 'Failed', message: err?.message || 'Could not change password.' });
+      showToast({ type: 'error', title: 'Failed', message: err?.message || 'Could not change password.' });
     } finally {
       setIsSaving(false);
     }
@@ -174,7 +177,6 @@ const Settings: React.FC = () => {
       }}
     >
       <PrimeLoader isLoading={isLoading || isSaving} />
-      <ToastNotification toast={toast} onClose={() => setToast(null)} />
 
       <SettingsHeader isSaving={isSaving} onSave={handleSave} />
 

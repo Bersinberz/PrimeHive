@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import type { Product } from '../../../services/admin/productService';
+import { usePermission } from '../../../hooks/usePermission';
 
 interface ProductListProps {
   products: Product[];
@@ -18,6 +19,9 @@ const ProductList: React.FC<ProductListProps> = ({
   products, isLoading, searchQuery, onAddFirst, onEdit, onDelete,
   isFetchingMore = false, hasMore = false, onLoadMore
 }) => {
+  const canEdit = usePermission('products', 'edit');
+  const canDelete = usePermission('products', 'delete');
+  const canCreate = usePermission('products', 'create');
 
   // Intersection Observer for Infinite Scroll
   const observerTarget = useRef<HTMLDivElement>(null);
@@ -72,7 +76,7 @@ const ProductList: React.FC<ProductListProps> = ({
         <p style={{ color: '#999', fontSize: '0.95rem', maxWidth: '360px', marginBottom: '24px', lineHeight: 1.6 }}>
           Start building your product collection. Add your first product to see it appear here.
         </p>
-        <button className="new-product-btn" onClick={onAddFirst}>
+        <button className="new-product-btn" onClick={onAddFirst} style={{ display: canCreate ? undefined : 'none' }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
             <line x1="12" y1="5" x2="12" y2="19" />
             <line x1="5" y1="12" x2="19" y2="12" />
@@ -166,6 +170,7 @@ const ProductList: React.FC<ProductListProps> = ({
 
               {/* Hover Action Tray */}
               <div className="card-action-tray">
+                {canEdit && (
                 <button
                   className="action-btn edit-btn"
                   title="Edit"
@@ -175,6 +180,8 @@ const ProductList: React.FC<ProductListProps> = ({
                     <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
                   </svg>
                 </button>
+                )}
+                {canDelete && (
                 <button
                   className="action-btn delete-btn"
                   title="Delete"
@@ -185,6 +192,7 @@ const ProductList: React.FC<ProductListProps> = ({
                     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                   </svg>
                 </button>
+                )}
               </div>
             </motion.div>
           );

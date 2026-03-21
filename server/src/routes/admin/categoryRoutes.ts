@@ -7,37 +7,15 @@ import {
     assignProducts,
     updateCategory,
 } from "../../controllers/admin/categoryController";
-import { adminOnly, verifyToken } from "../../middleware/verifyToken";
+import { adminOnly, verifyToken, checkPermission } from "../../middleware/verifyToken";
 
 const router = express.Router();
 
-/**
- * Create Category
- */
-router.post("/create", verifyToken, adminOnly, createCategory);
-
-/**
- * Get All Categories
- */
-router.get("/get", verifyToken, adminOnly, getCategories);
-
-/**
- * Delete Category
- */
-router.delete("/delete/:id", verifyToken, adminOnly, deleteCategory);
-
-/**
- * Update Category
- */
-router.put("/update/:id", verifyToken, adminOnly, updateCategory);
-/**
- * Get Products assigned to a Category
- */
-router.get("/:id/products", verifyToken, adminOnly, getCategoryProducts);
-
-/**
- * Assign Products to a Category
- */
-router.put("/:id/products", verifyToken, adminOnly, assignProducts);
+router.post("/create",        verifyToken, adminOnly, checkPermission("categories", "create"), createCategory);
+router.get("/get",            verifyToken, adminOnly, checkPermission("categories", "view"),   getCategories);
+router.delete("/delete/:id",  verifyToken, adminOnly, checkPermission("categories", "delete"), deleteCategory);
+router.put("/update/:id",     verifyToken, adminOnly, checkPermission("categories", "edit"),   updateCategory);
+router.get("/:id/products",   verifyToken, adminOnly, checkPermission("categories", "view"),   getCategoryProducts);
+router.put("/:id/products",   verifyToken, adminOnly, checkPermission("categories", "edit"),   assignProducts);
 
 export default router;

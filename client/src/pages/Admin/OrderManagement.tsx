@@ -7,8 +7,9 @@ import {
   type Order,
   type OrderStatus,
 } from '../../services/admin/orderService';
+import { useToast } from '../../context/ToastContext';
 import PrimeLoader from '../../components/PrimeLoader';
-import ToastNotification from '../../components/Admin/ToastNotification';
+import { getInitialsAvatar } from '../../utils/avatarUtils';
 
 const OrderManagement: React.FC = () => {
   const [view, setView] = useState<'list' | 'details'>('list');
@@ -17,14 +18,7 @@ const OrderManagement: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [newStatus, setNewStatus] = useState<OrderStatus | ''>('');
-  const [toast, setToast] = useState<{ type: 'success' | 'error'; title: string; message: string } | null>(null);
-
-  useEffect(() => {
-    if (toast) {
-      const timer = setTimeout(() => setToast(null), 4000);
-      return () => clearTimeout(timer);
-    }
-  }, [toast]);
+  const { showToast } = useToast();
 
   // Fetch orders on mount
   const fetchOrders = async () => {
@@ -33,7 +27,7 @@ const OrderManagement: React.FC = () => {
       const data = await getOrders();
       setOrders(data);
     } catch (error: any) {
-      setToast({ type: 'error', title: 'Load Failed', message: error?.message || 'Could not load orders.' });
+      showToast({ type: 'error', title: 'Couldn\'t load orders', message: error?.message || 'Something went wrong. Please refresh and try again.' });
     } finally {
       setIsLoading(false);
     }
@@ -51,7 +45,7 @@ const OrderManagement: React.FC = () => {
       setNewStatus(fullOrder.status);
       setView('details');
     } catch (error: any) {
-      setToast({ type: 'error', title: 'Load Failed', message: 'Could not load order details.' });
+      showToast({ type: 'error', title: 'Couldn\'t load order', message: 'We couldn\'t fetch the order details. Please try again.' });
     } finally {
       setIsLoading(false);
     }
@@ -65,11 +59,10 @@ const OrderManagement: React.FC = () => {
       const updatedOrder = await updateOrderStatus(selectedOrder._id, newStatus as OrderStatus);
       setSelectedOrder(updatedOrder);
       setNewStatus(updatedOrder.status);
-      setToast({ type: 'success', title: 'Status Updated', message: `Order moved to "${updatedOrder.status}".` });
-      // Also refresh the list data
+      showToast({ type: 'success', title: 'Status updated', message: `Order is now marked as "${updatedOrder.status}".` });
       fetchOrders();
     } catch (error: any) {
-      setToast({ type: 'error', title: 'Update Failed', message: error?.message || 'Could not update status.' });
+      showToast({ type: 'error', title: 'Couldn\'t update status', message: error?.message || 'Something went wrong. Please try again.' });
     } finally {
       setIsSaving(false);
     }
@@ -84,16 +77,16 @@ const OrderManagement: React.FC = () => {
 
   // Helper for Status Badge Styling
   const getStatusBadgeClass = (status: OrderStatus) => {
-    switch (status) {
-      case 'Delivered': return 'bg-success bg-opacity-10 text-success';
-      case 'Processing': return 'bg-info bg-opacity-10 text-info';
-      case 'Shipped': return 'bg-primary bg-opacity-10 text-primary';
-      case 'Pending': return 'bg-warning bg-opacity-10 text-warning';
-      case 'Paid': return 'bg-secondary bg-opacity-10 text-secondary';
-      case 'Cancelled':
-      case 'Refunded': return 'bg-danger bg-opacity-10 text-danger';
-      default: return 'bg-light text-dark';
-    }
+    const map: Record<string, { color: string; bg: string }> = {
+      Delivered: { color: '#10b981', bg: 'rgba(16,185,129,0.08)' },
+      Processing: { color: '#06b6d4', bg: 'rgba(6,182,212,0.08)' },
+      Shipped: { color: '#6366f1', bg: 'rgba(99,102,241,0.08)' },
+      Pending: { color: '#f59e0b', bg: 'rgba(245,158,11,0.08)' },
+      Paid: { color: '#64748b', bg: 'rgba(100,116,139,0.08)' },
+      Cancelled: { color: '#ef4444', bg: 'rgba(239,68,68,0.08)' },
+      Refunded: { color: '#ef4444', bg: 'rgba(239,68,68,0.08)' },
+    };
+    return map[status] || { color: '#999', bg: '#f5f5f7' };
   };
 
   const formatDate = (dateStr: string) => {
@@ -129,7 +122,6 @@ const OrderManagement: React.FC = () => {
       }}
     >
       <PrimeLoader isLoading={isLoading || isSaving} />
-      <ToastNotification toast={toast} onClose={() => setToast(null)} />
 
       <AnimatePresence mode="wait">
         {view === 'list' ? (
@@ -138,26 +130,30 @@ const OrderManagement: React.FC = () => {
              ========================================= */
           <motion.div key="list" variants={pageVariants} initial="initial" animate="animate" exit="exit">
             {/* Header */}
-            <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
-              <div>
-                <h2 className="fw-bolder mb-1 text-dark" style={{ letterSpacing: '-0.5px' }}>Orders Management</h2>
-                <p className="text-muted mb-0">Track, fulfill, and manage customer orders.</p>
-              </div>
+            <div style={{ marginBottom: '28px' }}>
+              <p style={{ fontSize: '0.72rem', fontWeight: 800, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.8px', margin: '0 0 4px' }}>
+                Management
+              </p>
+              <h2 style={{ fontSize: '2rem', fontWeight: 900, color: '#1a1a1a', letterSpacing: '-1px', margin: '0 0 6px' }}>
+                Orders
+              </h2>
+              <p style={{ color: '#999', fontSize: '0.9rem', fontWeight: 500, margin: 0 }}>
+                Track, fulfill, and manage customer orders.
+              </p>
             </div>
 
             {/* Table Card */}
-            <div className="card border-0 shadow-sm bg-white overflow-hidden" style={{ borderRadius: '16px' }}>
+            <div style={{ background: '#fff', borderRadius: '20px', border: '1px solid #f0f0f2', overflow: 'hidden' }}>
               <div className="table-responsive p-0">
                 <table className="table table-hover align-middle mb-0">
-                  <thead className="bg-light bg-opacity-50">
+                  <thead style={{ background: '#fafafa' }}>
                     <tr>
-                      <th className="py-3 px-4 border-0 text-uppercase small fw-bold text-secondary">Order ID</th>
-                      <th className="py-3 px-4 border-0 text-uppercase small fw-bold text-secondary">Customer</th>
-                      <th className="py-3 px-4 border-0 text-uppercase small fw-bold text-secondary">Date</th>
-                      <th className="py-3 px-4 border-0 text-uppercase small fw-bold text-secondary">Payment</th>
-                      <th className="py-3 px-4 border-0 text-uppercase small fw-bold text-secondary">Status</th>
-                      <th className="py-3 px-4 border-0 text-uppercase small fw-bold text-secondary text-end">Total</th>
-                      <th className="py-3 px-4 border-0 text-uppercase small fw-bold text-secondary text-end">Actions</th>
+                      {['Order ID', 'Customer', 'Date', 'Payment', 'Status', 'Total', 'Actions'].map((h, i) => (
+                        <th key={h} className={`py-3 px-4 border-0 ${i === 5 || i === 6 ? 'text-end' : ''}`}
+                          style={{ fontSize: '0.68rem', fontWeight: 800, color: '#bbb', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                          {h}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
@@ -166,7 +162,7 @@ const OrderManagement: React.FC = () => {
                         <td className="py-3 px-4 border-light fw-bold text-dark">{o.orderId}</td>
                         <td className="py-3 px-4 border-light">
                           <div className="d-flex align-items-center">
-                            <img src={`https://ui-avatars.com/api/?name=${(o.customer?.name || 'U').replace(' ', '+')}&background=f8fafc&color=475569`} alt={o.customer?.name} className="rounded-circle me-3 border" width="36" height="36" />
+                            <img src={getInitialsAvatar(o.customer?.name || 'U', '#f8fafc', '#475569')} alt={o.customer?.name} className="rounded-circle me-3 border" width="36" height="36" />
                             <span className="fw-bold text-dark">{o.customer?.name || 'Unknown'}</span>
                           </div>
                         </td>
@@ -178,7 +174,12 @@ const OrderManagement: React.FC = () => {
                           </span>
                         </td>
                         <td className="py-3 px-4 border-light">
-                          <span className={`badge rounded-pill px-3 py-2 fw-bold ${getStatusBadgeClass(o.status)}`}>
+                          <span style={{
+                            fontSize: '0.72rem', fontWeight: 700,
+                            color: getStatusBadgeClass(o.status).color,
+                            background: getStatusBadgeClass(o.status).bg,
+                            padding: '4px 12px', borderRadius: '20px',
+                          }}>
                             {o.status}
                           </span>
                         </td>
@@ -192,8 +193,10 @@ const OrderManagement: React.FC = () => {
                     ))}
                     {!isLoading && orders.length === 0 && (
                       <tr>
-                        <td colSpan={7} className="text-center py-5 text-muted">
-                          No orders found.
+                        <td colSpan={7} style={{ padding: '60px', textAlign: 'center' }}>
+                          <p style={{ color: '#bbb', fontSize: '0.9rem', fontWeight: 600, margin: 0 }}>
+                            No orders yet — they'll appear here once customers start placing them.
+                          </p>
                         </td>
                       </tr>
                     )}
@@ -210,20 +213,34 @@ const OrderManagement: React.FC = () => {
             <motion.div key="details" variants={pageVariants} initial="initial" animate="animate" exit="exit">
 
               {/* Header */}
-              <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
-                <div className="d-flex align-items-center gap-3">
-                  <button onClick={() => { setView('list'); setSelectedOrder(null); }} className="btn btn-light rounded-circle p-2 border-0 shadow-sm" style={{ width: '40px', height: '40px' }}>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '28px', gap: '16px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                  <button
+                    onClick={() => { setView('list'); setSelectedOrder(null); }}
+                    className="back-nav-btn"
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" />
+                    </svg>
+                    Back to Orders
                   </button>
-                  <div>
-                    <h3 className="fw-bolder mb-1 text-dark d-flex align-items-center gap-3" style={{ letterSpacing: '-0.5px' }}>
-                      Order {selectedOrder.orderId}
-                      <span className={`badge rounded-pill fs-6 px-3 py-1 fw-bold ${getStatusBadgeClass(selectedOrder.status)}`}>
-                        {selectedOrder.status}
-                      </span>
+                </div>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                    <h3 style={{ fontWeight: 900, color: '#1a1a1a', fontSize: '1.6rem', letterSpacing: '-0.5px', margin: 0 }}>
+                      {selectedOrder.orderId}
                     </h3>
-                    <p className="text-muted mb-0">Placed on {formatDate(selectedOrder.createdAt)}</p>
+                    <span style={{
+                      fontSize: '0.72rem', fontWeight: 700,
+                      color: getStatusBadgeClass(selectedOrder.status).color,
+                      background: getStatusBadgeClass(selectedOrder.status).bg,
+                      padding: '5px 14px', borderRadius: '20px',
+                    }}>{selectedOrder.status}</span>
                   </div>
+                  <p style={{ color: '#999', fontSize: '0.88rem', fontWeight: 500, margin: '4px 0 0' }}>
+                    Placed on {formatDate(selectedOrder.createdAt)}
+                  </p>
                 </div>
               </div>
 
@@ -232,52 +249,61 @@ const OrderManagement: React.FC = () => {
                 <div className="col-12 col-xl-8 d-flex flex-column gap-4">
 
                   {/* Ordered Items */}
-                  <div className="card border-0 shadow-sm bg-white p-4" style={{ borderRadius: '16px' }}>
-                    <h5 className="fw-bolder mb-4 text-dark border-bottom pb-3">Items Ordered</h5>
-                    <div className="d-flex flex-column gap-3">
+                  <div style={{ background: '#fff', borderRadius: '20px', border: '1px solid #f0f0f2', padding: '24px' }}>
+                    <p style={{ fontSize: '0.72rem', fontWeight: 800, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.8px', margin: '0 0 4px' }}>
+                      Summary
+                    </p>
+                    <h5 style={{ fontWeight: 900, color: '#1a1a1a', fontSize: '1.1rem', margin: '0 0 20px', letterSpacing: '-0.3px' }}>
+                      Items Ordered
+                    </h5>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       {selectedOrder.items.map((item, idx) => (
-                        <div key={idx} className="d-flex justify-content-between align-items-center p-3 border rounded-3 border-light bg-light bg-opacity-50">
-                          <div className="d-flex align-items-center gap-3">
+                        <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderRadius: '14px', border: '1px solid #f0f0f2', background: '#fafafa' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                             {item.image ? (
-                              <img src={item.image} alt={item.name} className="rounded-3 shadow-sm" width="60" height="60" style={{ objectFit: 'cover' }} />
+                              <img src={item.image} alt={item.name} style={{ width: '56px', height: '56px', borderRadius: '12px', objectFit: 'cover', border: '1px solid #f0f0f2' }} />
                             ) : (
-                              <div className="rounded-3 bg-light d-flex align-items-center justify-content-center shadow-sm" style={{ width: '60px', height: '60px' }}>
-                                <span className="text-muted small">No Img</span>
+                              <div style={{ width: '56px', height: '56px', borderRadius: '12px', background: '#f0f0f2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <span style={{ color: '#bbb', fontSize: '0.7rem', fontWeight: 600 }}>No img</span>
                               </div>
                             )}
                             <div>
-                              <h6 className="fw-bold text-dark mb-1">{item.name}</h6>
-                              <span className="text-muted small">Qty: {item.quantity}</span>
+                              <div style={{ fontWeight: 700, color: '#1a1a1a', fontSize: '0.9rem' }}>{item.name}</div>
+                              <div style={{ fontSize: '0.78rem', color: '#bbb', fontWeight: 500, marginTop: '2px' }}>Qty: {item.quantity}</div>
                             </div>
                           </div>
-                          <h6 className="fw-bolder text-dark mb-0">₹{(item.price * item.quantity).toFixed(2)}</h6>
+                          <div style={{ fontWeight: 800, color: '#1a1a1a', fontSize: '0.95rem' }}>₹{(item.price * item.quantity).toFixed(2)}</div>
                         </div>
                       ))}
                     </div>
-                    <div className="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
-                      <span className="fw-bold text-muted">Total Amount</span>
-                      <h4 className="fw-bolder text-dark mb-0">₹{selectedOrder.totalAmount.toFixed(2)}</h4>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #f0f0f2' }}>
+                      <span style={{ fontWeight: 700, color: '#aaa', fontSize: '0.85rem' }}>Total</span>
+                      <h4 style={{ fontWeight: 900, color: '#1a1a1a', fontSize: '1.4rem', letterSpacing: '-0.5px', margin: 0 }}>₹{selectedOrder.totalAmount.toFixed(2)}</h4>
                     </div>
                   </div>
 
                   {/* Timeline */}
-                  <div className="card border-0 shadow-sm bg-white p-4" style={{ borderRadius: '16px' }}>
-                    <h5 className="fw-bolder mb-4 text-dark border-bottom pb-3 d-flex align-items-center gap-2">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                  <div style={{ background: '#fff', borderRadius: '20px', border: '1px solid #f0f0f2', padding: '24px' }}>
+                    <p style={{ fontSize: '0.72rem', fontWeight: 800, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.8px', margin: '0 0 4px' }}>
+                      History
+                    </p>
+                    <h5 style={{ fontWeight: 900, color: '#1a1a1a', fontSize: '1.1rem', margin: '0 0 20px', letterSpacing: '-0.3px' }}>
                       Order Timeline
                     </h5>
-                    <div className="position-relative ms-3 border-start border-2 border-light pb-2">
+                    <div style={{ position: 'relative', paddingLeft: '20px', borderLeft: '2px solid #f0f0f2' }}>
                       {selectedOrder.timeline.map((event, idx) => (
-                        <div key={idx} className="position-relative mb-4 ps-4">
-                          <span
-                            className="position-absolute top-0 start-0 translate-middle p-2 rounded-circle border border-2 border-white bg-primary"
-                            style={{ width: '16px', height: '16px', left: '-1px' }}
-                          ></span>
-                          <h6 className="fw-bold mb-1 text-dark">{event.status}</h6>
-                          <small className="text-muted">
-                            {formatDate(event.timestamp)} • {formatTime(event.timestamp)}
-                          </small>
-                          {event.note && <p className="text-muted small mb-0 mt-1 fst-italic">"{event.note}"</p>}
+                        <div key={idx} style={{ position: 'relative', marginBottom: '20px', paddingLeft: '20px' }}>
+                          <span style={{
+                            position: 'absolute', left: '-27px', top: '2px',
+                            width: '14px', height: '14px', borderRadius: '50%',
+                            background: 'var(--prime-orange)', border: '2px solid #fff',
+                            display: 'block',
+                          }} />
+                          <div style={{ fontWeight: 700, color: '#1a1a1a', fontSize: '0.9rem' }}>{event.status}</div>
+                          <div style={{ fontSize: '0.75rem', color: '#bbb', fontWeight: 500, marginTop: '2px' }}>
+                            {formatDate(event.timestamp)} · {formatTime(event.timestamp)}
+                          </div>
+                          {event.note && <p style={{ color: '#999', fontSize: '0.8rem', fontStyle: 'italic', margin: '4px 0 0' }}>"{event.note}"</p>}
                         </div>
                       ))}
                     </div>
@@ -289,77 +315,76 @@ const OrderManagement: React.FC = () => {
                 <div className="col-12 col-xl-4 d-flex flex-column gap-4">
 
                   {/* Change Status Action Box */}
-                  <div className="card border-0 shadow-sm p-4" style={{ borderRadius: '16px', background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' }}>
-                    <h6 className="fw-bolder mb-3 text-white">Update Status</h6>
+                  <div style={{ background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', borderRadius: '20px', padding: '24px' }}>
+                    <p style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.8px', margin: '0 0 4px' }}>
+                      Actions
+                    </p>
+                    <h6 style={{ fontWeight: 900, color: '#fff', fontSize: '1rem', margin: '0 0 16px' }}>Update Status</h6>
                     <select
-                      className="form-select form-select-lg mb-3 bg-dark border-secondary text-white shadow-none"
+                      style={{
+                        width: '100%', padding: '12px 16px', borderRadius: '12px',
+                        border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.08)',
+                        color: '#fff', fontWeight: 600, fontSize: '0.9rem', marginBottom: '12px', outline: 'none',
+                      }}
                       value={newStatus}
                       onChange={(e) => setNewStatus(e.target.value as OrderStatus)}
                       disabled={isSaving || ['Cancelled', 'Refunded', 'Delivered'].includes(selectedOrder.status)}
                     >
-                      <option value="Pending">Pending</option>
-                      <option value="Paid">Paid</option>
-                      <option value="Processing">Processing</option>
-                      <option value="Shipped">Shipped</option>
-                      <option value="Delivered">Delivered</option>
-                      <option value="Cancelled">Cancelled</option>
-                      <option value="Refunded">Refunded</option>
+                      {['Pending', 'Paid', 'Processing', 'Shipped', 'Delivered', 'Cancelled', 'Refunded'].map(s => (
+                        <option key={s} value={s} style={{ background: '#1e293b' }}>{s}</option>
+                      ))}
                     </select>
                     <button
-                      className="btn w-100 fw-bold py-2 border-0"
-                      style={{ background: 'var(--prime-gradient, linear-gradient(135deg, #ff8c42 0%, #ff5722 100%))', color: '#fff', borderRadius: '8px' }}
+                      style={{
+                        width: '100%', padding: '12px', borderRadius: '12px', border: 'none',
+                        background: 'var(--prime-orange)', color: '#fff', fontWeight: 800, fontSize: '0.9rem', cursor: 'pointer',
+                      }}
                       onClick={handleStatusUpdate}
                       disabled={isSaving || newStatus === selectedOrder.status || ['Cancelled', 'Refunded', 'Delivered'].includes(selectedOrder.status)}
                     >
                       {isSaving ? 'Updating...' : 'Apply Changes'}
                     </button>
                     {['Cancelled', 'Refunded', 'Delivered'].includes(selectedOrder.status) && (
-                      <small className="text-warning mt-2 d-block">This order is finalized and cannot be changed.</small>
+                      <p style={{ color: '#f59e0b', fontSize: '0.78rem', fontWeight: 600, margin: '10px 0 0', textAlign: 'center' }}>
+                        This order is finalized and can't be changed.
+                      </p>
                     )}
                   </div>
 
                   {/* Customer Info */}
-                  <div className="card border-0 shadow-sm bg-white p-4" style={{ borderRadius: '16px' }}>
-                    <h6 className="fw-bolder mb-3 text-dark d-flex align-items-center gap-2">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                      Customer Details
-                    </h6>
-                    <div className="d-flex align-items-center mb-3">
-                      <img src={`https://ui-avatars.com/api/?name=${(selectedOrder.customer?.name || 'U').replace(' ', '+')}&background=f8fafc&color=475569`} alt="Customer" className="rounded-circle me-3 border" width="48" height="48" />
-                      <div>
-                        <h6 className="fw-bold text-dark mb-0">{selectedOrder.customer?.name || 'Unknown'}</h6>
-                      </div>
+                  <div style={{ background: '#fff', borderRadius: '20px', border: '1px solid #f0f0f2', padding: '24px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#aaa" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                      <p style={{ fontSize: '0.72rem', fontWeight: 800, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.8px', margin: 0 }}>Customer</p>
                     </div>
-                    <div className="d-flex flex-column gap-2 small">
-                      <span className="text-secondary d-flex align-items-center gap-2">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
-                        {selectedOrder.customer?.email || 'N/A'}
-                      </span>
-                      <span className="text-secondary d-flex align-items-center gap-2">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
-                        {selectedOrder.customer?.phone || 'N/A'}
-                      </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                      <img src={getInitialsAvatar(selectedOrder.customer?.name || 'U', '#f8fafc', '#475569')} alt="Customer" style={{ width: '44px', height: '44px', borderRadius: '50%', border: '1px solid #f0f0f2' }} />
+                      <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#1a1a1a' }}>{selectedOrder.customer?.name || 'Unknown'}</div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <span style={{ fontSize: '0.82rem', color: '#999', fontWeight: 500 }}>{selectedOrder.customer?.email || 'N/A'}</span>
+                      <span style={{ fontSize: '0.82rem', color: '#999', fontWeight: 500 }}>{selectedOrder.customer?.phone || 'N/A'}</span>
                     </div>
                   </div>
 
                   {/* Shipping Info */}
-                  <div className="card border-0 shadow-sm bg-white p-4" style={{ borderRadius: '16px' }}>
-                    <h6 className="fw-bolder mb-3 text-dark d-flex align-items-center gap-2">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
-                      Shipping Address
-                    </h6>
-                    <p className="text-secondary small mb-0" style={{ whiteSpace: 'pre-line', lineHeight: '1.6' }}>
+                  <div style={{ background: '#fff', borderRadius: '20px', border: '1px solid #f0f0f2', padding: '24px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#aaa" strokeWidth="2"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+                      <p style={{ fontSize: '0.72rem', fontWeight: 800, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.8px', margin: 0 }}>Shipping Address</p>
+                    </div>
+                    <p style={{ color: '#666', fontSize: '0.88rem', fontWeight: 500, margin: 0, whiteSpace: 'pre-line', lineHeight: 1.7 }}>
                       {formatAddress(selectedOrder.shippingAddress)}
                     </p>
                   </div>
 
                   {/* Payment Info */}
-                  <div className="card border-0 shadow-sm bg-white p-4" style={{ borderRadius: '16px' }}>
-                    <h6 className="fw-bolder mb-3 text-dark d-flex align-items-center gap-2">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
-                      Payment Details
-                    </h6>
-                    <p className="text-secondary small fw-bold mb-0">
+                  <div style={{ background: '#fff', borderRadius: '20px', border: '1px solid #f0f0f2', padding: '24px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#aaa" strokeWidth="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+                      <p style={{ fontSize: '0.72rem', fontWeight: 800, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.8px', margin: 0 }}>Payment</p>
+                    </div>
+                    <p style={{ color: '#1a1a1a', fontSize: '0.9rem', fontWeight: 700, margin: 0 }}>
                       {selectedOrder.paymentMethod || 'N/A'}
                     </p>
                   </div>

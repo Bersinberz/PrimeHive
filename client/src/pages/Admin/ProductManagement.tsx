@@ -9,8 +9,8 @@ import {
   type Product,
 } from '../../services/admin/productService';
 
+import { useToast } from '../../context/ToastContext';
 import PrimeLoader from '../../components/PrimeLoader';
-import ToastNotification from '../../components/Admin/ToastNotification';
 import ProductHeader from '../../components/Admin/Products/ProductHeader';
 import ProductList from '../../components/Admin/Products/ProductList';
 import ProductForm from '../../components/Admin/Products/ProductForm';
@@ -38,25 +38,18 @@ const ProductManagement: React.FC = () => {
 
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
-  const [toast, setToast] = useState<{ type: 'success' | 'error'; title: string; message: string } | null>(null);
-
-  useEffect(() => {
-    if (toast) {
-      const timer = setTimeout(() => setToast(null), 4000);
-      return () => clearTimeout(timer);
-    }
-  }, [toast]);
+  const { showToast } = useToast();
 
   // Initial Fetch (Page 1) - Requests exactly 12 items
   const fetchProducts = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await getProducts({ page: 1, limit: 1000 });
+      const data = await getProducts({ page: 1, limit: 50 });
       setProducts(data);
       setPage(1);
-      setHasMore(false);
+      setHasMore(data.length === 50);
     } catch (error: any) {
-      setToast({ type: 'error', title: 'Fetch Failed', message: error?.message || 'Could not load products. Please try again.' });
+      showToast({ type: 'error', title: 'Fetch Failed', message: error?.message || 'Could not load products. Please try again.' });
     } finally {
       setIsLoading(false);
     }
@@ -64,16 +57,15 @@ const ProductManagement: React.FC = () => {
 
   const fetchMoreProducts = async () => {
     if (isFetchingMore || !hasMore) return;
-
     setIsFetchingMore(true);
     try {
       const nextPage = page + 1;
-      const data = await getProducts({ page: nextPage, limit: 1000 });
+      const data = await getProducts({ page: nextPage, limit: 50 });
       setProducts(prev => [...prev, ...data]);
       setPage(nextPage);
-      setHasMore(false);
+      setHasMore(data.length === 50);
     } catch (error: any) {
-      setToast({ type: 'error', title: 'Load Failed', message: 'Could not load more products.' });
+      showToast({ type: 'error', title: 'Load Failed', message: 'Could not load more products.' });
     } finally {
       setIsFetchingMore(false);
     }
@@ -86,10 +78,10 @@ const ProductManagement: React.FC = () => {
     setIsSaving(true);
     try {
       await deleteProduct(productToDelete._id);
-      setToast({ type: 'success', title: 'Deleted', message: 'Product removed successfully.' });
+      showToast({ type: 'success', title: 'Deleted', message: 'Product removed successfully.' });
       setProducts(prev => prev.filter(p => p._id !== productToDelete._id));
     } catch (error: any) {
-      setToast({ type: 'error', title: 'Delete Failed', message: error?.message || 'Could not delete product.' });
+      showToast({ type: 'error', title: 'Delete Failed', message: error?.message || 'Could not delete product.' });
     } finally {
       setIsSaving(false);
       setProductToDelete(null);
@@ -101,11 +93,11 @@ const ProductManagement: React.FC = () => {
     try {
       if (id) {
         const updated = await updateProduct(id, payload);
-        setToast({ type: 'success', title: 'Updated', message: 'Product updated successfully!' });
+        showToast({ type: 'success', title: 'Updated', message: 'Product updated successfully!' });
         setProducts(prev => prev.map(p => p._id === id ? updated : p));
       } else {
         await createProduct(payload);
-        setToast({ type: 'success', title: 'Created', message: 'New product added successfully!' });
+        showToast({ type: 'success', title: 'Created', message: 'New product added successfully!' });
         fetchProducts();
       }
       setEditingProduct(null);
@@ -131,8 +123,7 @@ const ProductManagement: React.FC = () => {
         flexDirection: 'column'
       }}
     >
-      <PrimeLoader isLoading={isSaving} />
-      <ToastNotification toast={toast} onClose={() => setToast(null)} />
+      <PrimeLoader isLoading={isLoading || isSaving} />
       <ActionConfirmModal 
         isOpen={!!productToDelete}
         actionType="delete_product"
@@ -174,7 +165,7 @@ const ProductManagement: React.FC = () => {
               isSaving={isSaving}
               onSave={handleSaveProduct}
               onCancel={() => { setEditingProduct(null); setView('list'); }}
-              showToast={setToast}
+              showToast={showToast}
             />
           </motion.div>
         )}

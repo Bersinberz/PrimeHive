@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { type Category } from '../../../services/admin/categoryService';
+import { usePermission } from '../../../hooks/usePermission';
 
 interface CategoryListProps {
   categories: Category[];
@@ -25,6 +26,9 @@ const CategoryList: React.FC<CategoryListProps> = ({
   searchQuery, onAddFirst, onEdit, onAssign, onDelete, onLoadMore
 }) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const canEdit = usePermission('categories', 'edit');
+  const canDelete = usePermission('categories', 'delete');
+  const canCreate = usePermission('categories', 'create');
   const observerTarget = useRef<HTMLDivElement>(null);
 
   // Infinite Scroll Trigger
@@ -65,7 +69,7 @@ const CategoryList: React.FC<CategoryListProps> = ({
         <p style={{ color: '#999', fontSize: '0.95rem', maxWidth: '360px', marginBottom: '24px', lineHeight: 1.6 }}>
           Organize your catalog by creating collections. Group similar products to help customers find what they need.
         </p>
-        <button className="btn text-white fw-bold px-4 py-2" onClick={onAddFirst} style={{ background: 'var(--prime-orange, #ff8c42)', borderRadius: '10px', border: 'none' }}>
+        <button className="btn text-white fw-bold px-4 py-2" onClick={onAddFirst} style={{ background: 'var(--prime-orange, #ff8c42)', borderRadius: '10px', border: 'none', display: canCreate ? undefined : 'none' }}>
           Create First Category
         </button>
       </div>
@@ -171,27 +175,31 @@ const CategoryList: React.FC<CategoryListProps> = ({
                         Assign Products
                       </button>
 
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setExpandedId(null); onEdit(cat); }}
-                        className="btn btn-sm d-flex align-items-center gap-2 px-3 py-2 fw-bold"
-                        style={{ borderRadius: '10px', color: '#6366f1', background: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.2)' }}
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
-                        </svg>
-                        Edit
-                      </button>
+                      {canEdit && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setExpandedId(null); onEdit(cat); }}
+                          className="btn btn-sm d-flex align-items-center gap-2 px-3 py-2 fw-bold"
+                          style={{ borderRadius: '10px', color: '#6366f1', background: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.2)' }}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+                          </svg>
+                          Edit
+                        </button>
+                      )}
 
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setExpandedId(null); onDelete(cat); }}
-                        className="btn btn-sm d-flex align-items-center gap-2 px-3 py-2 fw-bold"
-                        style={{ borderRadius: '10px', color: '#ef4444', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)' }}
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                        </svg>
-                        Delete
-                      </button>
+                      {canDelete && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setExpandedId(null); onDelete(cat); }}
+                          className="btn btn-sm d-flex align-items-center gap-2 px-3 py-2 fw-bold"
+                          style={{ borderRadius: '10px', color: '#ef4444', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)' }}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                          </svg>
+                          Delete
+                        </button>
+                      )}
                     </div>
                   </motion.div>
                 )}

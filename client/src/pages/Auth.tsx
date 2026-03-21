@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import LoginForm from '../components/Auth/Login';
 import SignupForm from '../components/Auth/Signup';
 
 const AuthPage: React.FC = () => {
-  const [isLogin, setIsLogin] = useState(true);
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const mode = searchParams.get("mode");
+  const [isLogin, setIsLogin] = useState(mode !== "register");
 
   return (
     <div

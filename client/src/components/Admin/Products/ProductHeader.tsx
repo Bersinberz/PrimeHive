@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import type { Product } from '../../../services/admin/productService';
+import { usePermission } from '../../../hooks/usePermission';
 
 interface ProductHeaderProps {
   view: 'list' | 'add';
@@ -17,6 +18,7 @@ const ProductHeader: React.FC<ProductHeaderProps> = ({
   searchQuery, onSearchChange,
   onAddClick, onBackClick
 }) => {
+  const canCreate = usePermission('products', 'create');
 
   const totalProducts = products.length;
   const inStock = products.filter(p => p.stock > 10).length;
@@ -65,7 +67,7 @@ const ProductHeader: React.FC<ProductHeaderProps> = ({
             Manage your entire product catalog
           </p>
         </div>
-        <button className="new-product-btn" onClick={onAddClick}>
+        <button className="new-product-btn" onClick={onAddClick} style={{ display: canCreate ? undefined : 'none' }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
             <line x1="12" y1="5" x2="12" y2="19" />
             <line x1="5" y1="12" x2="19" y2="12" />

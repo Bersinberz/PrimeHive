@@ -9,8 +9,8 @@ import {
   type Category,
 } from '../../services/admin/categoryService';
 
+import { useToast } from '../../context/ToastContext';
 import PrimeLoader from '../../components/PrimeLoader';
-import ToastNotification from '../../components/Admin/ToastNotification';
 import AssignProducts from '../../components/Admin/Categories/AssignProducts';
 import CategoryForm from '../../components/Admin/Categories/CategoryForm';
 import CategoryHeader from '../../components/Admin/Categories/CategoryHeader';
@@ -21,57 +21,42 @@ const CategoryManagement: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
-
-  // Search
   const [searchQuery, setSearchQuery] = useState('');
-
-  // Pagination
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
-
-  const [toast, setToast] = useState<{ type: 'success' | 'error'; title: string; message: string } | null>(null);
-
-  // Overlay States
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
-
-  // Assign Drawer States
   const [categoryToAssign, setCategoryToAssign] = useState<Category | null>(null);
 
-  useEffect(() => {
-    if (toast) {
-      const timer = setTimeout(() => setToast(null), 4000);
-      return () => clearTimeout(timer);
-    }
-  }, [toast]);
+  const { showToast } = useToast();
 
   const fetchCategories = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await getCategories({ page: 1, limit: 1000 });
+      const data = await getCategories({ page: 1, limit: 50 });
       setCategories(data);
       setPage(1);
-      setHasMore(false);
+      setHasMore(data.length === 50);
     } catch (error: any) {
-      setToast({ type: 'error', title: 'Fetch Failed', message: error?.message || 'Could not load categories.' });
+      showToast({ type: 'error', title: 'Couldn\'t load categories', message: 'Something went wrong. Please refresh and try again.' });
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [showToast]);
 
   const fetchMoreCategories = async () => {
     if (isFetchingMore || !hasMore) return;
     setIsFetchingMore(true);
     try {
       const nextPage = page + 1;
-      const data = await getCategories({ page: nextPage, limit: 1000 });
+      const data = await getCategories({ page: nextPage, limit: 50 });
       setCategories(prev => [...prev, ...data]);
       setPage(nextPage);
-      setHasMore(false);
+      setHasMore(data.length === 50);
     } catch (error: any) {
-      setToast({ type: 'error', title: 'Load Failed', message: 'Could not load more categories.' });
+      showToast({ type: 'error', title: 'Couldn\'t load more', message: 'We hit a snag loading more categories. Please try again.' });
     } finally {
       setIsFetchingMore(false);
     }
@@ -81,31 +66,19 @@ const CategoryManagement: React.FC = () => {
     fetchCategories();
   }, [fetchCategories]);
 
-  // --- Form Modal Handlers ---
-  const handleOpenAddModal = () => {
-    setEditingCategory(null);
-    setIsFormModalOpen(true);
-  };
+  const handleOpenAddModal = () => { setEditingCategory(null); setIsFormModalOpen(true); };
+  const handleOpenEditModal = (category: Category) => { setEditingCategory(category); setIsFormModalOpen(true); };
+  const handleCloseFormModal = () => { setIsFormModalOpen(false); setEditingCategory(null); };
 
-  const handleOpenEditModal = (category: Category) => {
-    setEditingCategory(category);
-    setIsFormModalOpen(true);
-  };
-
-  const handleCloseFormModal = () => {
-    setIsFormModalOpen(false);
-    setEditingCategory(null);
-  };
-
-  const handleSaveCategory = async (payload: { name: string, description: string }, id?: string) => {
+  const handleSaveCategory = async (payload: { name: string; description: string }, id?: string) => {
     setIsSaving(true);
     try {
       if (id) {
         await updateCategory(id, payload);
-        setToast({ type: 'success', title: 'Updated', message: 'Category updated successfully!' });
+        showToast({ type: 'success', title: 'Saved', message: 'Category updated successfully.' });
       } else {
         await createCategory(payload);
-        setToast({ type: 'success', title: 'Created', message: 'New category added successfully!' });
+        showToast({ type: 'success', title: 'Category created', message: 'Your new category is ready to use.' });
       }
       handleCloseFormModal();
       fetchCategories();
@@ -116,16 +89,15 @@ const CategoryManagement: React.FC = () => {
     }
   };
 
-  // --- Delete Handlers ---
   const confirmDelete = async () => {
     if (!categoryToDelete) return;
     setIsSaving(true);
     try {
       await deleteCategory(categoryToDelete._id);
-      setToast({ type: 'success', title: 'Deleted', message: 'Category removed successfully.' });
+      showToast({ type: 'success', title: 'Deleted', message: 'Category removed.' });
       setCategories(prev => prev.filter(c => c._id !== categoryToDelete._id));
     } catch (error: any) {
-      setToast({ type: 'error', title: 'Delete Failed', message: error?.message || 'Could not delete category.' });
+      showToast({ type: 'error', title: 'Couldn\'t delete', message: error?.message || 'Something went wrong. Please try again.' });
     } finally {
       setIsSaving(false);
       setCategoryToDelete(null);
@@ -140,17 +112,15 @@ const CategoryManagement: React.FC = () => {
       className="mx-auto position-relative pb-5"
       style={{ maxWidth: '1400px', minHeight: '80vh', display: 'flex', flexDirection: 'column' }}
     >
-      <PrimeLoader isLoading={isSaving} />
-      <ToastNotification toast={toast} onClose={() => setToast(null)} />
-      <ActionConfirmModal 
+      <PrimeLoader isLoading={isLoading || isSaving} />
+      <ActionConfirmModal
         isOpen={!!categoryToDelete}
         actionType="delete"
         itemName={categoryToDelete?.name || ''}
-        onConfirm={confirmDelete} 
-        onCancel={() => setCategoryToDelete(null)} 
+        onConfirm={confirmDelete}
+        onCancel={() => setCategoryToDelete(null)}
       />
 
-      {/* 1. Add/Edit Category Modal */}
       <AnimatePresence>
         {isFormModalOpen && (
           <CategoryForm
@@ -158,24 +128,22 @@ const CategoryManagement: React.FC = () => {
             isSaving={isSaving}
             onSave={handleSaveCategory}
             onClose={handleCloseFormModal}
-            showToast={setToast}
+            showToast={showToast}
           />
         )}
       </AnimatePresence>
 
-      {/* 2. Assign Products Right Drawer */}
       <AnimatePresence>
         {categoryToAssign && (
           <AssignProducts
             category={categoryToAssign}
             onClose={() => setCategoryToAssign(null)}
-            showToast={setToast}
+            showToast={showToast}
             refreshCategories={fetchCategories}
           />
         )}
       </AnimatePresence>
 
-      {/* Base Page Content */}
       <CategoryHeader
         categories={categories}
         searchQuery={searchQuery}
@@ -195,7 +163,6 @@ const CategoryManagement: React.FC = () => {
         onDelete={setCategoryToDelete}
         onLoadMore={fetchMoreCategories}
       />
-
     </motion.div>
   );
 };

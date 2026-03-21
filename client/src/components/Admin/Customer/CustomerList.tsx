@@ -1,9 +1,9 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import type { Customer } from '../../../services/admin/customerService';
+import DeletionCountdown from '../DeletionCountdown';
 
-
-type CustomerStatus = 'active' | 'inactive';
+type CustomerStatus = 'active' | 'inactive' | 'deleted';
 
 interface CustomerListProps {
   customers: Customer[];
@@ -15,10 +15,10 @@ interface CustomerListProps {
 
 const getStatusStyle = (status: CustomerStatus) => {
   switch (status) {
-    case 'active': return { color: '#10b981', bg: 'rgba(16, 185, 129, 0.08)' };
+    case 'active':   return { color: '#10b981', bg: 'rgba(16, 185, 129, 0.08)' };
     case 'inactive': return { color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.08)' };
-
-    default: return { color: '#999', bg: '#f0f0f2' };
+    case 'deleted':  return { color: '#9ca3af', bg: 'rgba(107,114,128,0.08)' };
+    default:         return { color: '#999', bg: '#f0f0f2' };
   }
 };
 
@@ -26,6 +26,14 @@ const formatDate = (dateStr: string) => {
   return new Date(dateStr).toLocaleDateString('en-IN', {
     year: 'numeric', month: 'short', day: 'numeric',
   });
+};
+
+const formatPhone = (phone: string) => {
+  if (!phone) return phone;
+  const clean = phone.replace(/\D/g, '');
+  if (clean.length === 12 && clean.startsWith('91')) return `+91 ${clean.slice(2)}`;
+  if (clean.length === 10) return `+91 ${clean}`;
+  return phone.replace(/^\+91/, '+91 ').replace(/^\+?91(\d)/, '+91 $1');
 };
 
 const CustomerList: React.FC<CustomerListProps> = ({ customers, filteredCustomers, searchQuery, isLoading, onViewProfile }) => {
@@ -70,6 +78,7 @@ const CustomerList: React.FC<CustomerListProps> = ({ customers, filteredCustomer
 
       {/* Rows */}
       {filteredCustomers.map((c, i) => {
+        const isDeleted = c.status === 'deleted';
         const statusStyle = getStatusStyle(c.status as CustomerStatus);
         return (
           <motion.div
@@ -83,32 +92,39 @@ const CustomerList: React.FC<CustomerListProps> = ({ customers, filteredCustomer
               padding: '16px 24px', alignItems: 'center', cursor: 'pointer',
               borderBottom: i < filteredCustomers.length - 1 ? '1px solid #f5f5f7' : 'none',
               transition: 'background 0.15s',
+              opacity: isDeleted ? 0.65 : 1,
+              background: isDeleted ? 'rgba(107,114,128,0.02)' : 'transparent',
             }}
             onMouseEnter={e => e.currentTarget.style.background = '#fafafa'}
-            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            onMouseLeave={e => e.currentTarget.style.background = isDeleted ? 'rgba(107,114,128,0.02)' : 'transparent'}
           >
             {/* Name + Email */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
               {c.profilePicture ? (
-                  <img src={c.profilePicture} alt={c.name} style={{ width: '42px', height: '42px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1px solid #f0f0f2' }} />
+                  <img src={c.profilePicture} alt={c.name} style={{ width: '42px', height: '42px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1px solid #f0f0f2', filter: isDeleted ? 'grayscale(1)' : 'none' }} />
               ) : (
                   <div style={{
                     width: '42px', height: '42px', borderRadius: '50%',
-                    background: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)',
+                    background: isDeleted ? '#e5e7eb' : 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontWeight: 800, fontSize: '0.8rem', color: '#64748b', flexShrink: 0,
+                    fontWeight: 800, fontSize: '0.8rem', color: isDeleted ? '#9ca3af' : '#64748b', flexShrink: 0,
                   }}>
                     {c.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
                   </div>
               )}
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#1a1a1a' }}>{c.name}</div>
+                <div style={{ fontWeight: 700, fontSize: '0.9rem', color: isDeleted ? '#9ca3af' : '#1a1a1a', textDecoration: isDeleted ? 'line-through' : 'none' }}>{c.name}</div>
                 <div style={{ fontSize: '0.78rem', color: '#999', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.email}</div>
+                {isDeleted && c.deletedAt && (
+                  <div style={{ marginTop: '4px' }}>
+                    <DeletionCountdown deletedAt={c.deletedAt} />
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Phone */}
-            <div style={{ fontSize: '0.85rem', color: '#666', fontWeight: 500 }}>{c.phone}</div>
+            <div style={{ fontSize: '0.85rem', color: '#666', fontWeight: 500 }}>{formatPhone(c.phone)}</div>
 
             {/* Status */}
             <div>
