@@ -43,6 +43,8 @@ export interface IOrder extends Document {
     shippingAddress: IShippingAddress;
     status: OrderStatus;
     timeline: ITimelineEvent[];
+    couponCode?: string;
+    couponDiscount?: number;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -129,6 +131,8 @@ const OrderSchema = new Schema<IOrder>(
             type: [TimelineEventSchema],
             default: [],
         },
+        couponCode: { type: String },
+        couponDiscount: { type: Number, min: 0 },
     },
     { timestamps: true }
 );

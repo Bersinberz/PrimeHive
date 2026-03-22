@@ -14,11 +14,16 @@ interface CartContextType {
   removeItem: (productId: string) => Promise<void>;
   updateQuantity: (productId: string, quantity: number) => Promise<void>;
   clearCart: () => Promise<void>;
+  savedItems: CartItem[];
+  saveForLater: (productId: string) => void;
+  moveToCart: (productId: string) => void;
+  removeSaved: (productId: string) => void;
 }
 
 // ── Local Storage Helpers ──────────────────────────────────────────────────
 
 const GUEST_CART_KEY = "primehive_guest_cart";
+const SAVED_LATER_KEY = "primehive_saved_later";
 
 const loadGuestCart = (): CartItem[] => {
   try {
@@ -37,6 +42,19 @@ const clearGuestCart = () => {
   localStorage.removeItem(GUEST_CART_KEY);
 };
 
+const loadSavedLater = (): CartItem[] => {
+  try {
+    const raw = localStorage.getItem(SAVED_LATER_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+
+const persistSavedLater = (items: CartItem[]) => {
+  localStorage.setItem(SAVED_LATER_KEY, JSON.stringify(items));
+};
+
 // ── Context ────────────────────────────────────────────────────────────────
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -53,6 +71,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { user, isAuthenticated } = useAuth();
   const [items, setItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [savedItems, setSavedItems] = useState<CartItem[]>(loadSavedLater);
 
   // ── Load cart on auth state change ──────────────────────────────────────
 
@@ -180,11 +199,52 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     clearGuestCart();
   }, [isLoggedInUser]);
 
+  // ── Save for Later ───────────────────────────────────────────────────────
+
+  useEffect(() => {
+    persistSavedLater(savedItems);
+  }, [savedItems]);
+
+  const saveForLater = useCallback((productId: string) => {
+    setItems(prev => {
+      const item = prev.find(i => i.product === productId);
+      if (!item) return prev;
+      setSavedItems(s => s.find(i => i.product === productId) ? s : [...s, { ...item, quantity: 1 }]);
+      return prev.filter(i => i.product !== productId);
+    });
+    // Also remove from server cart if logged in
+    if (isLoggedInUser) {
+      cartService.removeCartItem(productId).catch(() => {});
+    }
+  }, [isLoggedInUser]);
+
+  const moveToCart = useCallback((productId: string) => {
+    setSavedItems(prev => {
+      const item = prev.find(i => i.product === productId);
+      if (!item) return prev;
+      setItems(cart => {
+        const exists = cart.find(i => i.product === productId);
+        const updated = exists
+          ? cart.map(i => i.product === productId ? { ...i, quantity: i.quantity + 1 } : i)
+          : [...cart, { ...item, quantity: 1 }];
+        if (isLoggedInUser) {
+          cartService.addToCart(productId, 1).then(c => setItems(c.items || [])).catch(() => {});
+        }
+        return updated;
+      });
+      return prev.filter(i => i.product !== productId);
+    });
+  }, [isLoggedInUser]);
+
+  const removeSaved = useCallback((productId: string) => {
+    setSavedItems(prev => prev.filter(i => i.product !== productId));
+  }, []);
+
   const totalItems = items.reduce((sum, i) => sum + i.quantity, 0);
   const totalPrice = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
 
   return (
-    <CartContext.Provider value={{ items, totalItems, totalPrice, loading, addItem, removeItem, updateQuantity, clearCart }}>
+    <CartContext.Provider value={{ items, totalItems, totalPrice, loading, addItem, removeItem, updateQuantity, clearCart, savedItems, saveForLater, moveToCart, removeSaved }}>
       {children}
     </CartContext.Provider>
   );

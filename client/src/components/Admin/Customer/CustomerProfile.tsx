@@ -5,6 +5,7 @@ import { getCustomerStats } from '../../../services/admin/customerService';
 import ActionConfirmModal, { type ActionConfirmType } from '../ActionConfirmModal';
 import { usePermission } from '../../../hooks/usePermission';
 import DeletionCountdown from '../DeletionCountdown';
+import { formatPhone } from '../../../utils/formatPhone';
 
 type CustomerStatus = 'active' | 'inactive' | 'deleted';
 
@@ -123,7 +124,7 @@ const CustomerProfile: React.FC<CustomerProfileProps> = ({ customer, isSaving, o
             <div style={{ marginTop: '28px', borderTop: '1px solid #f0f0f2', paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '14px', textAlign: 'left' }}>
               {[
                 { label: 'Email', value: customer.email },
-                { label: 'Phone', value: customer.phone.startsWith('+91') && !customer.phone.includes(' ') ? `+91 ${customer.phone.slice(3)}` : customer.phone },
+                { label: 'Phone', value: formatPhone(customer.phone) },
                 { label: 'Date of Birth', value: customer.dateOfBirth ? formatDate(customer.dateOfBirth) : 'Not specified' },
                 { label: 'Gender', value: customer.gender || 'Not specified' },
                 { label: 'Member Since', value: formatDate(customer.createdAt) },

@@ -1,5 +1,13 @@
 import axiosInstance from "../axiosInstance";
 
+export interface ActiveOffer {
+  offerId: string;
+  label: string;
+  discountType: "percentage" | "fixed";
+  discountValue: number;
+  discountedPrice: number;
+}
+
 export interface StorefrontProduct {
   _id: string;
   name: string;
@@ -12,7 +20,9 @@ export interface StorefrontProduct {
   description?: string;
   sku?: string;
   sellerName?: string;
+  salesCount?: number;
   createdAt: string;
+  activeOffer?: ActiveOffer;
 }
 
 export interface ProductFilters {
@@ -22,7 +32,7 @@ export interface ProductFilters {
   category?: string;
   minPrice?: number;
   maxPrice?: number;
-  sort?: "newest" | "oldest" | "price-asc" | "price-desc";
+  sort?: "newest" | "oldest" | "price-asc" | "price-desc" | "popular";
 }
 
 export interface PaginatedProducts {

@@ -4,9 +4,11 @@ import StorefrontNavbar from "./StorefrontNavbar";
 
 const StorefrontLayout: React.FC = () => {
   return (
-    <div className="min-vh-100" style={{ backgroundColor: "var(--prime-bg-soft)" }}>
+    <div className="d-flex flex-column min-vh-100" style={{ backgroundColor: "var(--prime-bg-soft)" }}>
       <StorefrontNavbar />
-      <Outlet />
+      <div className="flex-grow-1">
+        <Outlet />
+      </div>
     </div>
   );
 };

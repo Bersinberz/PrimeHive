@@ -15,6 +15,7 @@ import ProductHeader from '../../components/Admin/Products/ProductHeader';
 import ProductList from '../../components/Admin/Products/ProductList';
 import ProductForm from '../../components/Admin/Products/ProductForm';
 import ActionConfirmModal from '../../components/Admin/ActionConfirmModal';
+import ProductPreviewModal from '../../components/Admin/Products/ProductPreviewModal';
 
 const pageVariants: Variants = {
   initial: { opacity: 0 },
@@ -38,6 +39,7 @@ const ProductManagement: React.FC = () => {
 
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+  const [previewProduct, setPreviewProduct] = useState<Product | null>(null);
   const { showToast } = useToast();
 
   // Initial Fetch (Page 1) - Requests exactly 12 items
@@ -132,6 +134,7 @@ const ProductManagement: React.FC = () => {
         onConfirm={confirmDelete} 
         onCancel={() => setProductToDelete(null)} 
       />
+      <ProductPreviewModal product={previewProduct} onClose={() => setPreviewProduct(null)} />
 
       <ProductHeader
         view={view}
@@ -155,6 +158,7 @@ const ProductManagement: React.FC = () => {
               onAddFirst={() => { setEditingProduct(null); setView('add'); }}
               onEdit={(p) => { setEditingProduct(p); setView('add'); }}
               onDelete={setProductToDelete}
+              onPreview={setPreviewProduct}
               onLoadMore={fetchMoreProducts}
             />
           </motion.div>

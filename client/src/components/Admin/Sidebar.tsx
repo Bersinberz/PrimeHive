@@ -37,6 +37,7 @@ const Sidebar: React.FC = () => {
     { name: 'Orders',     path: '/admin/orders',     module: 'orders'     as keyof Permissions, icon: <><circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" /><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" /></> },
     { name: 'Customers',  path: '/admin/customers',  module: 'customers'  as keyof Permissions, superAdminOnly: true, icon: <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /> },
     { name: 'Staff',      path: '/admin/staff',      module: 'staff'      as keyof Permissions, superAdminOnly: true, icon: <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></> },
+    { name: 'Offers & Coupons', path: '/admin/offers', module: 'dashboard' as keyof Permissions, superAdminOnly: true, icon: <><path d="M9 14l6-6" /><circle cx="9.5" cy="9.5" r="0.5" fill="currentColor" /><circle cx="14.5" cy="14.5" r="0.5" fill="currentColor" /><path d="M2 12C2 6.48 6.48 2 12 2s10 4.48 10 10-4.48 10-10 10S2 17.52 2 12z" /></> },
     { name: 'Settings',   path: '/admin/settings',   module: 'settings'   as keyof Permissions, superAdminOnly: true, icon: <><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" /></> },
     { name: 'Store Profile', path: '/admin/store-profile', module: 'dashboard' as keyof Permissions, staffOnly: true, icon: <><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></> },
     { name: 'Account Settings', path: '/admin/account-settings', module: 'dashboard' as keyof Permissions, staffOnly: true, icon: <><circle cx="12" cy="8" r="4" /><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" /></> },
@@ -70,14 +71,16 @@ const Sidebar: React.FC = () => {
           src={Logo}
           alt={`${storeName} Logo`}
           style={{
-            width: "40px",
-            height: "40px",
+            width: "44px",
+            height: "44px",
             objectFit: "contain",
-            marginRight: "10px"
+            marginRight: "12px",
+            flexShrink: 0,
           }}
         />
-        {/* Applied the global glowing gradient class here */}
-        <span className="fs-4 brand-name-breathe tracking-wide">{storeName}</span>
+        <span className="brand-name-breathe" style={{ fontSize: "1.55rem" }}>
+          {storeName}
+        </span>
       </div>
 
       <ul className="nav nav-pills flex-column mb-auto gap-2 px-2">

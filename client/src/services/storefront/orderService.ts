@@ -19,6 +19,8 @@ export interface PlaceOrderPayload {
   shippingAddress: ShippingAddress;
   paymentMethod: string;
   guestEmail?: string;
+  couponId?: string;
+  couponDiscount?: number;
 }
 
 export interface OrderConfirmation {
@@ -32,11 +34,20 @@ export interface OrderConfirmation {
 export interface MyOrder {
   _id: string;
   orderId: string;
-  items: { name: string; price: number; quantity: number; image: string }[];
+  items: { product?: string; name: string; price: number; quantity: number; image: string }[];
   totalAmount: number;
+  subtotal?: number;
+  shippingCost?: number;
+  tax?: number;
+  taxRate?: number;
+  taxInclusive?: boolean;
+  couponCode?: string;
+  couponDiscount?: number;
   status: string;
+  paymentMethod?: string;
   createdAt: string;
   shippingAddress: ShippingAddress;
+  timeline?: { status: string; timestamp: string; note?: string }[];
 }
 
 export const placeOrder = async (payload: PlaceOrderPayload): Promise<OrderConfirmation> => {
@@ -51,5 +62,15 @@ export const getMyOrders = async (page = 1): Promise<{ data: MyOrder[]; paginati
 
 export const getMyOrderById = async (id: string): Promise<MyOrder> => {
   const { data } = await axiosInstance.get(`/orders/my/${id}`);
+  return data;
+};
+
+export const cancelOrder = async (id: string): Promise<{ message: string; status: string }> => {
+  const { data } = await axiosInstance.post(`/orders/my/${id}/cancel`);
+  return data;
+};
+
+export const requestRefund = async (id: string, reason?: string): Promise<{ message: string; status: string }> => {
+  const { data } = await axiosInstance.post(`/orders/my/${id}/refund`, { reason });
   return data;
 };

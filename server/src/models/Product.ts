@@ -11,6 +11,7 @@ export interface IProduct extends Document {
   status: "active" | "draft" | "archived";
   images: string[];
   createdBy?: mongoose.Types.ObjectId;
+  salesCount: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -81,10 +82,21 @@ const ProductSchema = new Schema<IProduct>(
       ref: "User",
       default: null,
     },
+
+    salesCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
   },
   {
     timestamps: true,
   }
+);
+
+ProductSchema.index(
+  { name: "text", category: "text", description: "text" },
+  { weights: { name: 10, category: 5, description: 3 }, name: "product_text_search" }
 );
 
 export default mongoose.model<IProduct>("Product", ProductSchema);

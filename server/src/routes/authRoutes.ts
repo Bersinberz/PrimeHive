@@ -8,6 +8,21 @@ import {
     setPassword,
     resendSetupEmail,
 } from "../controllers/authController";
+import {
+    getProfile,
+    updateProfile,
+    changePassword,
+    getAddresses,
+    addAddress,
+    updateAddress,
+    deleteAddress,
+    deactivateAccount,
+    sendVerification,
+    verifyEmail,
+} from "../controllers/profileController";
+import { verifyToken } from "../middleware/verifyToken";
+import { userOnly } from "../middleware/userOnly";
+import { uploadProfile } from "../middleware/upload";
 
 const router = express.Router();
 
@@ -29,5 +44,17 @@ router.post("/refresh", refreshSession);
 router.post("/logout", logout);
 router.post("/set-password", setupLimiter, setPassword);
 router.post("/resend-setup-email", setupLimiter, resendSetupEmail);
+
+// Customer self-service profile (user role only)
+router.get("/profile", verifyToken, userOnly, getProfile);
+router.put("/profile", verifyToken, userOnly, uploadProfile.single("profilePicture"), updateProfile);
+router.put("/change-password", verifyToken, userOnly, changePassword);
+router.get("/addresses", verifyToken, userOnly, getAddresses);
+router.post("/addresses", verifyToken, userOnly, addAddress);
+router.put("/addresses/:id", verifyToken, userOnly, updateAddress);
+router.delete("/addresses/:id", verifyToken, userOnly, deleteAddress);
+router.delete("/account", verifyToken, userOnly, deactivateAccount);
+router.post("/send-verification", verifyToken, userOnly, sendVerification);
+router.get("/verify-email", verifyEmail);
 
 export default router;

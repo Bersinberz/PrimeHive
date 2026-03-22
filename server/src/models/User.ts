@@ -37,6 +37,9 @@ export interface IUser extends Document {
   isPasswordSet: boolean;
   passwordSetToken?: string;
   passwordSetExpires?: Date;
+  emailVerified: boolean;
+  emailVerificationToken?: string;
+  emailVerificationExpires?: Date;
   // Staff store profile
   storeName?: string;
   storeDescription?: string;
@@ -114,6 +117,18 @@ const userSchema = new mongoose.Schema<IUser>(
       select: false,
     },
     passwordSetExpires: {
+      type: Date,
+      select: false,
+    },
+    emailVerified: {
+      type: Boolean,
+      default: false,
+    },
+    emailVerificationToken: {
+      type: String,
+      select: false,
+    },
+    emailVerificationExpires: {
       type: Date,
       select: false,
     },

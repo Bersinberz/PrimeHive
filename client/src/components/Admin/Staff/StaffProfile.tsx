@@ -6,6 +6,7 @@ import { resendStaffSetupEmail, getStaffStoreStats } from '../../../services/adm
 import ActionConfirmModal, { type ActionConfirmType } from '../ActionConfirmModal';
 import DeletionCountdown from '../DeletionCountdown';
 import { useToast } from '../../../context/ToastContext';
+import { formatPhone } from '../../../utils/formatPhone';
 
 type StaffStatus = 'active' | 'inactive';
 
@@ -164,7 +165,7 @@ const StaffProfile: React.FC<StaffProfileProps> = ({
                     <div style={{ marginTop: 28, borderTop: '1px solid #f0f0f2', paddingTop: 20, display: 'flex', flexDirection: 'column', gap: 14, textAlign: 'left' }}>
                         {[
                             { label: 'Email',       value: staff.email },
-                            { label: 'Phone',       value: staff.phone.startsWith('+91') && !staff.phone.includes(' ') ? `+91 ${staff.phone.slice(3)}` : staff.phone },
+                            { label: 'Phone',       value: formatPhone(staff.phone) },
                             { label: 'Date of Birth', value: staff.dateOfBirth ? formatDate(staff.dateOfBirth) : 'Not Provided' },
                             { label: 'Gender',      value: staff.gender || 'Not Provided' },
                             { label: 'Joined',      value: formatDate(staff.createdAt) },

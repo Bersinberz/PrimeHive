@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import Order from "../../models/Order";
 import Product from "../../models/Product";
 import mongoose from "mongoose";
+import { sendOrderStatusEmail } from "../../utils/sendOrderStatusEmail";
 
 /**
  * Get All Orders (admin list view — paginated with search)
@@ -151,6 +152,21 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
             .populate("customer", "name email phone");
 
         res.status(200).json(updatedOrder);
+
+        // Fire-and-forget: send status update email to customer
+        const customerEmail =
+            (updatedOrder?.customer as any)?.email || order.guestEmail;
+        const customerName = (updatedOrder?.customer as any)?.name || "Customer";
+
+        if (customerEmail) {
+            sendOrderStatusEmail({
+                to: customerEmail,
+                customerName,
+                orderId: order.orderId,
+                newStatus: status,
+                note: note || undefined,
+            }).catch(() => { /* already logged inside */ });
+        }
     } catch (error: any) {
         res.status(500).json({
             message:

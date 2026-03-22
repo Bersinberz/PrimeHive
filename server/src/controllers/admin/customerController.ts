@@ -233,7 +233,7 @@ export const getCustomerStats = async (req: Request, res: Response) => {
                         as: "productDoc",
                     },
                 },
-                { $unwind: { path: "$productDoc", preserveNullAndEmpty: true } },
+                { $unwind: { path: "$productDoc", preserveNullAndEmptyArrays: true } },
                 {
                     $lookup: {
                         from: "categories",
@@ -242,7 +242,7 @@ export const getCustomerStats = async (req: Request, res: Response) => {
                         as: "categoryDoc",
                     },
                 },
-                { $unwind: { path: "$categoryDoc", preserveNullAndEmpty: true } },
+                { $unwind: { path: "$categoryDoc", preserveNullAndEmptyArrays: true } },
                 {
                     $group: {
                         _id: "$categoryDoc.name",

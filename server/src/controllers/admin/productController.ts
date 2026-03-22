@@ -96,7 +96,9 @@ export const getProducts = async (req: Request, res: Response) => {
         }
 
         const [products, total] = await Promise.all([
-            Product.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+            Product.find(filter)
+                .populate("createdBy", "name email phone storeName storeDescription storeLocation storePhone profilePicture")
+                .sort({ createdAt: -1 }).skip(skip).limit(limit),
             Product.countDocuments(filter),
         ]);
 

@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { 
   ShoppingCart, LogOut, Package, LogIn, Search, X, Menu, 
-  UserCircle, ChevronDown, Truck} from "lucide-react";
+  UserCircle, ChevronDown, Truck, Sun, Moon } from "lucide-react";
+import { useTheme } from "../../context/ThemeContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../../context/AuthContext";
 import { useCart } from "../../context/CartContext";
@@ -15,6 +16,7 @@ const StorefrontNavbar: React.FC = () => {
   const { user, isAuthenticated, logout } = useAuth();
   const { totalItems } = useCart();
   const { storeName, freeShippingThreshold } = useSettings();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -94,15 +96,15 @@ const StorefrontNavbar: React.FC = () => {
 
   return (
     <>
-      <header className="sticky-top w-100 z-3 shadow-sm" style={{ background: "var(--prime-deep)" }}>
+      <header className="sticky-top w-100 z-3 shadow-sm" style={{ background: "var(--navbar-bg)" }}>
         {/* TOP ROW: Logo, Search, Account, Cart */}
         <div className="container py-3 border-bottom" style={{ borderColor: "rgba(255,255,255,0.15) !important" }}>
           <div className="d-flex align-items-center justify-content-between gap-3 gap-xl-5">
             
             {/* Logo */}
-            <Link to="/" className="text-decoration-none d-flex align-items-center flex-shrink-0 text-white">
-              <img src={Logo} alt={storeName} width="45" className="me-2" />
-              <span className="fw-black fs-3 d-none d-sm-inline" style={{ letterSpacing: "-0.5px" }}>
+            <Link to="/" className="text-decoration-none d-flex align-items-center flex-shrink-0">
+              <img src={Logo} alt={storeName} width="44" className="me-2" style={{ objectFit: "contain" }} />
+              <span className="d-none d-sm-inline brand-name-breathe" style={{ fontSize: "1.55rem" }}>
                 {storeName}
               </span>
             </Link>
@@ -275,15 +277,36 @@ const StorefrontNavbar: React.FC = () => {
                       <div className="d-flex flex-column py-2">
                         {isAuthenticated ? (
                           <>
-                            <div className="px-4 py-2 text-muted fw-bold" style={{ fontSize: '0.8rem' }}>
-                              Hi, {user?.name || "Customer"}!
+                            {/* Mini profile header */}
+                            <div className="px-3 pt-2 pb-3 mb-1" style={{ borderBottom: "1px solid #f0f0f0" }}>
+                              <div className="d-flex align-items-center gap-3">
+                                <div className="rounded-circle overflow-hidden d-flex align-items-center justify-content-center flex-shrink-0"
+                                  style={{ width: 42, height: 42, background: "linear-gradient(135deg,#c44a00,#FF6B2B)", border: "2px solid #f0f0f0" }}>
+                                  {user?.profilePicture
+                                    ? <img src={user.profilePicture} alt="avatar" className="w-100 h-100 object-fit-cover" />
+                                    : <UserCircle size={22} color="#fff" />}
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="fw-black text-dark text-truncate" style={{ fontSize: "0.9rem", letterSpacing: "-0.2px" }}>{user?.name || "Customer"}</div>
+                                  <div className="text-muted text-truncate" style={{ fontSize: "0.75rem" }}>{user?.email}</div>
+                                </div>
+                              </div>
                             </div>
-                            <Link className="px-4 py-2 text-dark text-decoration-none fw-bold custom-hover-bg d-flex align-items-center gap-2" style={{ fontSize: "0.95rem" }} to="/orders" onClick={() => setShowAccountDropdown(false)}>
-                              <Package size={16} style={{ color: "var(--prime-orange)" }} /> My Orders
+                            <Link className="px-4 py-2 text-dark text-decoration-none fw-bold custom-hover-bg d-flex align-items-center gap-2" style={{ fontSize: "0.9rem" }} to="/account" onClick={() => setShowAccountDropdown(false)}>
+                              <UserCircle size={15} style={{ color: "var(--prime-orange)" }} /> My Account
+                            </Link>
+                            <Link className="px-4 py-2 text-dark text-decoration-none fw-bold custom-hover-bg d-flex align-items-center gap-2" style={{ fontSize: "0.9rem" }} to="/orders" onClick={() => setShowAccountDropdown(false)}>
+                              <Package size={15} style={{ color: "var(--prime-orange)" }} /> My Orders
+                            </Link>
+                            <Link className="px-4 py-2 text-dark text-decoration-none fw-bold custom-hover-bg d-flex align-items-center gap-2" style={{ fontSize: "0.9rem" }} to="/account/addresses" onClick={() => setShowAccountDropdown(false)}>
+                              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--prime-orange)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg> Saved Addresses
+                            </Link>
+                            <Link className="px-4 py-2 text-dark text-decoration-none fw-bold custom-hover-bg d-flex align-items-center gap-2" style={{ fontSize: "0.9rem" }} to="/account/password" onClick={() => setShowAccountDropdown(false)}>
+                              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--prime-orange)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Password & Security
                             </Link>
                             <div className="border-bottom my-1" style={{ borderColor: "#f0f0f0" }}></div>
-                            <button className="btn px-4 py-2 text-danger fw-bold custom-hover-bg d-flex align-items-center gap-2 text-start rounded-0 border-0" style={{ fontSize: "0.95rem", background: "transparent" }} onClick={() => { handleLogout(); setShowAccountDropdown(false); }}>
-                              <LogOut size={16} /> Sign Out
+                            <button className="btn px-4 py-2 text-danger fw-bold custom-hover-bg d-flex align-items-center gap-2 text-start rounded-0 border-0" style={{ fontSize: "0.9rem", background: "transparent" }} onClick={() => { handleLogout(); setShowAccountDropdown(false); }}>
+                              <LogOut size={15} /> Sign Out
                             </button>
                           </>
                         ) : (
@@ -303,6 +326,16 @@ const StorefrontNavbar: React.FC = () => {
                   )}
                 </AnimatePresence>
               </div>
+
+              {/* Theme Toggle */}
+              <button
+                className="theme-toggle-btn"
+                onClick={toggleTheme}
+                aria-label="Toggle dark mode"
+                title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+              >
+                {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+              </button>
 
               {/* Cart */}
               <Link to="/cart" className="text-white text-decoration-none d-flex align-items-center gap-2 position-relative ms-2">
@@ -339,10 +372,26 @@ const StorefrontNavbar: React.FC = () => {
         {/* BOTTOM ROW: Categories & Promo */}
         <div className="container py-2 d-none d-md-flex justify-content-between align-items-center text-white">
           <div className="d-flex align-items-center gap-4 fw-bold" style={{ fontSize: '0.95rem' }}>
-            <span style={{ cursor: "pointer" }} className="hover-opacity" onClick={() => navigate("/")}>Prime Deals</span>
-            <span style={{ cursor: "pointer" }} className="hover-opacity" onClick={() => navigate("/")}>New Arrivals</span>
-            <span style={{ cursor: "pointer" }} className="hover-opacity" onClick={() => navigate("/")}>Best Sellers</span>
-            <span style={{ cursor: "pointer" }} className="hover-opacity" onClick={() => navigate("/")}>Customer Service</span>
+            <Link to="/" className="text-white text-decoration-none hover-opacity d-flex align-items-center gap-1"
+              style={{ opacity: location.pathname === "/" ? 1 : 0.85 }}>
+              Home
+            </Link>
+            <Link to="/browse?view=prime-deals" className="text-white text-decoration-none hover-opacity"
+              style={{ opacity: location.pathname === "/browse" && location.search.includes("prime-deals") ? 1 : 0.85 }}>
+              Prime Deals
+            </Link>
+            <Link to="/browse?view=new-arrivals" className="text-white text-decoration-none hover-opacity"
+              style={{ opacity: location.pathname === "/browse" && location.search.includes("new-arrivals") ? 1 : 0.85 }}>
+              New Arrivals
+            </Link>
+            <Link to="/browse?view=best-sellers" className="text-white text-decoration-none hover-opacity"
+              style={{ opacity: location.pathname === "/browse" && location.search.includes("best-sellers") ? 1 : 0.85 }}>
+              Best Sellers
+            </Link>
+            <Link to="/browse?view=trending" className="text-white text-decoration-none hover-opacity"
+              style={{ opacity: location.pathname === "/browse" && location.search.includes("trending") ? 1 : 0.85 }}>
+              Trending Now
+            </Link>
           </div>
 
           <div className="fw-black d-flex align-items-center gap-2" style={{ color: "#FFD100", fontSize: '0.95rem', letterSpacing: '0.5px' }}>
@@ -400,6 +449,9 @@ const StorefrontNavbar: React.FC = () => {
 
               {isAuthenticated ? (
                 <>
+                  <Link to="/account" className="btn text-start fw-bold py-2 border-0 bg-transparent d-flex align-items-center gap-2" onClick={() => setMenuOpen(false)}>
+                    <UserCircle size={18} /> My Account
+                  </Link>
                   <Link to="/orders" className="btn text-start fw-bold py-2 border-0 bg-transparent d-flex align-items-center gap-2">
                     <Package size={18} /> My Orders
                   </Link>

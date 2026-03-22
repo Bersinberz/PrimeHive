@@ -18,6 +18,14 @@ const OrderManagement: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [newStatus, setNewStatus] = useState<OrderStatus | ''>('');
+
+  const PIPELINE_STEPS: OrderStatus[] = ['Pending', 'Paid', 'Processing', 'Shipped', 'Delivered'];
+  const DANGER_STEPS: OrderStatus[] = ['Cancelled', 'Refunded'];
+
+  const getStepIndex = (status: OrderStatus) => PIPELINE_STEPS.indexOf(status);
+
+  const isFinalized = (status: OrderStatus) =>
+    ['Cancelled', 'Refunded', 'Delivered'].includes(status);
   const { showToast } = useToast();
 
   // Fetch orders on mount
@@ -51,12 +59,13 @@ const OrderManagement: React.FC = () => {
     }
   };
 
-  const handleStatusUpdate = async () => {
-    if (!selectedOrder || !newStatus || newStatus === selectedOrder.status) return;
+  const handleStatusUpdate = async (targetStatus?: OrderStatus) => {
+    const statusToApply = targetStatus || (newStatus as OrderStatus);
+    if (!selectedOrder || !statusToApply || statusToApply === selectedOrder.status) return;
 
     setIsSaving(true);
     try {
-      const updatedOrder = await updateOrderStatus(selectedOrder._id, newStatus as OrderStatus);
+      const updatedOrder = await updateOrderStatus(selectedOrder._id, statusToApply);
       setSelectedOrder(updatedOrder);
       setNewStatus(updatedOrder.status);
       showToast({ type: 'success', title: 'Status updated', message: `Order is now marked as "${updatedOrder.status}".` });
@@ -319,35 +328,103 @@ const OrderManagement: React.FC = () => {
                     <p style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.8px', margin: '0 0 4px' }}>
                       Actions
                     </p>
-                    <h6 style={{ fontWeight: 900, color: '#fff', fontSize: '1rem', margin: '0 0 16px' }}>Update Status</h6>
-                    <select
-                      style={{
-                        width: '100%', padding: '12px 16px', borderRadius: '12px',
-                        border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.08)',
-                        color: '#fff', fontWeight: 600, fontSize: '0.9rem', marginBottom: '12px', outline: 'none',
-                      }}
-                      value={newStatus}
-                      onChange={(e) => setNewStatus(e.target.value as OrderStatus)}
-                      disabled={isSaving || ['Cancelled', 'Refunded', 'Delivered'].includes(selectedOrder.status)}
-                    >
-                      {['Pending', 'Paid', 'Processing', 'Shipped', 'Delivered', 'Cancelled', 'Refunded'].map(s => (
-                        <option key={s} value={s} style={{ background: '#1e293b' }}>{s}</option>
-                      ))}
-                    </select>
-                    <button
-                      style={{
-                        width: '100%', padding: '12px', borderRadius: '12px', border: 'none',
-                        background: 'var(--prime-orange)', color: '#fff', fontWeight: 800, fontSize: '0.9rem', cursor: 'pointer',
-                      }}
-                      onClick={handleStatusUpdate}
-                      disabled={isSaving || newStatus === selectedOrder.status || ['Cancelled', 'Refunded', 'Delivered'].includes(selectedOrder.status)}
-                    >
-                      {isSaving ? 'Updating...' : 'Apply Changes'}
-                    </button>
-                    {['Cancelled', 'Refunded', 'Delivered'].includes(selectedOrder.status) && (
-                      <p style={{ color: '#f59e0b', fontSize: '0.78rem', fontWeight: 600, margin: '10px 0 0', textAlign: 'center' }}>
+                    <h6 style={{ fontWeight: 900, color: '#fff', fontSize: '1rem', margin: '0 0 20px' }}>Update Status</h6>
+
+                    {isFinalized(selectedOrder.status) ? (
+                      <p style={{ color: '#f59e0b', fontSize: '0.82rem', fontWeight: 600, margin: 0, textAlign: 'center', padding: '12px', background: 'rgba(245,158,11,0.1)', borderRadius: '10px' }}>
                         This order is finalized and can't be changed.
                       </p>
+                    ) : (
+                      <>
+                        {/* Main pipeline steps */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+                          {PIPELINE_STEPS.map((step, idx) => {
+                            const currentIdx = getStepIndex(selectedOrder.status);
+                            const isDone = idx < currentIdx;
+                            const isCurrent = step === selectedOrder.status;
+                            const isNext = idx === currentIdx + 1;
+                            const isFuture = idx > currentIdx + 1;
+
+                            return (
+                              <button
+                                key={step}
+                                disabled={isSaving || isCurrent || isDone || isFuture}
+                                onClick={() => isNext ? handleStatusUpdate(step) : undefined}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: '10px',
+                                  padding: '10px 14px', borderRadius: '10px', border: 'none',
+                                  cursor: isNext ? 'pointer' : 'default',
+                                  background: isCurrent
+                                    ? 'var(--prime-orange)'
+                                    : isDone
+                                      ? 'rgba(255,255,255,0.06)'
+                                      : isNext
+                                        ? 'rgba(255,255,255,0.12)'
+                                        : 'rgba(255,255,255,0.03)',
+                                  opacity: isFuture ? 0.35 : 1,
+                                  transition: 'all 0.2s',
+                                }}
+                              >
+                                {/* Step indicator */}
+                                <span style={{
+                                  width: '22px', height: '22px', borderRadius: '50%', flexShrink: 0,
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  fontSize: '0.65rem', fontWeight: 800,
+                                  background: isCurrent
+                                    ? 'rgba(255,255,255,0.3)'
+                                    : isDone
+                                      ? 'rgba(16,185,129,0.3)'
+                                      : isNext
+                                        ? 'rgba(255,255,255,0.2)'
+                                        : 'rgba(255,255,255,0.08)',
+                                  color: isDone ? '#10b981' : '#fff',
+                                }}>
+                                  {isDone ? '✓' : idx + 1}
+                                </span>
+                                <span style={{
+                                  fontSize: '0.85rem', fontWeight: 700,
+                                  color: isCurrent ? '#fff' : isDone ? 'rgba(255,255,255,0.5)' : isNext ? '#fff' : 'rgba(255,255,255,0.3)',
+                                  flex: 1, textAlign: 'left',
+                                }}>
+                                  {step}
+                                </span>
+                                {isCurrent && (
+                                  <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)', background: 'rgba(255,255,255,0.15)', padding: '2px 8px', borderRadius: '20px' }}>
+                                    CURRENT
+                                  </span>
+                                )}
+                                {isNext && !isSaving && (
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="9 18 15 12 9 6" />
+                                  </svg>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {/* Danger actions */}
+                        {!['Cancelled', 'Refunded'].includes(selectedOrder.status) && (
+                          <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '14px', display: 'flex', gap: '8px' }}>
+                            {DANGER_STEPS.map(step => (
+                              <button
+                                key={step}
+                                disabled={isSaving}
+                                onClick={() => handleStatusUpdate(step)}
+                                style={{
+                                  flex: 1, padding: '9px 10px', borderRadius: '10px',
+                                  border: '1px solid rgba(239,68,68,0.3)',
+                                  background: 'rgba(239,68,68,0.08)',
+                                  color: '#f87171', fontWeight: 700, fontSize: '0.78rem',
+                                  cursor: 'pointer', transition: 'all 0.2s',
+                                }}
+                              >
+                                {step}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
 

@@ -13,6 +13,18 @@ export interface CreateProductPayload {
 }
 
 // Product type returned by the API
+export interface ProductCreator {
+  _id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  storeName?: string;
+  storeDescription?: string;
+  storeLocation?: string;
+  storePhone?: string;
+  profilePicture?: string;
+}
+
 export interface Product {
   _id: string;
   name: string;
@@ -24,6 +36,7 @@ export interface Product {
   stock: number;
   status: "active" | "draft" | "archived";
   images: string[];
+  createdBy?: ProductCreator;
 }
 
 export interface PaginatedResponse<T> {

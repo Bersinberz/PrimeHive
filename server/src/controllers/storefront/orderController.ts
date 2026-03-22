@@ -3,9 +3,11 @@ import mongoose from "mongoose";
 import Order from "../../models/Order";
 import Product from "../../models/Product";
 import Cart from "../../models/Cart";
+import Coupon from "../../models/Coupon";
 import Settings from "../../models/Settings";
 import { getNextSequence } from "../../models/Counter";
 import { sendOrderNotificationEmail } from "../../utils/sendOrderNotificationEmail";
+import { sendCustomerOrderEmail } from "../../utils/sendCustomerOrderEmail";
 import { sendLowStockEmail } from "../../utils/sendLowStockEmail";
 
 interface OrderItemInput {
@@ -23,7 +25,7 @@ export const createOrder = async (req: Request, res: Response) => {
   session.startTransaction();
 
   try {
-    const { items, shippingAddress, paymentMethod, guestEmail } = req.body;
+    const { items, shippingAddress, paymentMethod, guestEmail, couponId, couponDiscount: clientCouponDiscount } = req.body;
 
     // Basic validation
     if (!Array.isArray(items) || items.length === 0) {
@@ -102,7 +104,35 @@ export const createOrder = async (req: Request, res: Response) => {
     const subtotal = orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
     const shippingCost = subtotal >= freeThreshold ? 0 : shippingRate;
     const tax = taxInclusive ? 0 : Math.round(subtotal * (taxRate / 100) * 100) / 100;
-    const totalAmount = Math.round((subtotal + shippingCost + tax) * 100) / 100;
+
+    // Apply coupon discount if provided
+    let couponDiscount = 0;
+    let couponCode: string | undefined;
+    let resolvedCouponId: string | undefined;
+
+    if (couponId && req.user?.id) {
+      const coupon = await Coupon.findById(couponId).session(session);
+      if (coupon && coupon.isActive) {
+        const now = new Date();
+        const notExpired = !coupon.expiryDate || coupon.expiryDate > now;
+        const withinLimit = coupon.usageLimit === undefined || coupon.usageCount < coupon.usageLimit;
+        const notUsed = !coupon.usedBy.some(id => id.toString() === req.user!.id);
+        if (notExpired && withinLimit && notUsed) {
+          couponDiscount = coupon.discountType === "percentage"
+            ? Math.round(subtotal * (coupon.discountValue / 100))
+            : Math.min(coupon.discountValue, subtotal);
+          couponCode = coupon.code;
+          resolvedCouponId = coupon._id.toString();
+          // Track usage
+          await Coupon.findByIdAndUpdate(couponId, {
+            $inc: { usageCount: 1 },
+            $push: { usedBy: req.user.id },
+          }, { session });
+        }
+      }
+    }
+
+    const totalAmount = Math.round((subtotal + shippingCost + tax - couponDiscount) * 100) / 100;
 
     // Generate order ID
     const prefix = settings?.orderIdPrefix || "ORD-";
@@ -122,6 +152,7 @@ export const createOrder = async (req: Request, res: Response) => {
           status: "Pending",
           timeline: [{ status: "Pending", timestamp: new Date() }],
           ...(guestEmail && !req.user ? { guestEmail } : {}),
+          ...(couponCode ? { couponCode, couponDiscount } : {}),
         },
       ],
       { session }
@@ -141,10 +172,18 @@ export const createOrder = async (req: Request, res: Response) => {
 
     await session.commitTransaction();
 
+    // Increment salesCount for each product ordered (fire-and-forget)
+    const salesIncrements = orderItems.map(item =>
+      Product.findByIdAndUpdate(item.product, { $inc: { salesCount: item.quantity } })
+    );
+    Promise.all(salesIncrements).catch(() => {});
+
     // Fire-and-forget: notify staff whose products were ordered + check low stock
-    const customerName = req.user?.id
-      ? (await import("../../models/User").then(m => m.default.findById(req.user!.id).select("name").lean()))?.name ?? "A customer"
-      : "A guest";
+    const userRecord = req.user?.id
+      ? await import("../../models/User").then(m => m.default.findById(req.user!.id).select("name email").lean())
+      : null;
+    const customerName = (userRecord as any)?.name ?? "A customer";
+    const customerEmail = (userRecord as any)?.email ?? guestEmail;
 
     // Build enriched items with createdBy for notification routing
     const enrichedItems = orderItems.map(item => {
@@ -152,12 +191,28 @@ export const createOrder = async (req: Request, res: Response) => {
       return { ...item, createdBy: (product as any)?.createdBy };
     });
 
-    sendOrderNotificationEmail({
-      orderId,
-      totalAmount,
-      customerName,
-      items: enrichedItems,
-    });
+    sendOrderNotificationEmail({ orderId, totalAmount, customerName, items: enrichedItems });
+
+    // Send customer confirmation email
+    if (customerEmail) {
+      sendCustomerOrderEmail({
+        to: customerEmail,
+        customerName,
+        orderId,
+        items: orderItems.map(i => ({ name: i.name, quantity: i.quantity, price: i.price, image: i.image })),
+        subtotal,
+        shippingCost,
+        tax,
+        taxRate,
+        taxInclusive,
+        couponCode,
+        couponDiscount: couponDiscount > 0 ? couponDiscount : undefined,
+        totalAmount,
+        paymentMethod,
+        shippingAddress,
+        createdAt: order.createdAt,
+      });
+    }
 
     // Check low stock for all products in this order after deduction
     const updatedProducts = await Product.find({ _id: { $in: productIds } })
@@ -169,7 +224,17 @@ export const createOrder = async (req: Request, res: Response) => {
       orderId: order.orderId,
       _id: order._id,
       totalAmount: order.totalAmount,
+      subtotal,
+      shippingCost,
+      tax,
+      taxRate,
+      taxInclusive,
+      couponCode: order.couponCode,
+      couponDiscount: order.couponDiscount,
       status: order.status,
+      paymentMethod: order.paymentMethod,
+      shippingAddress: order.shippingAddress,
+      items: order.items,
       createdAt: order.createdAt,
     });
   } catch (error: any) {
@@ -179,6 +244,101 @@ export const createOrder = async (req: Request, res: Response) => {
     });
   } finally {
     session.endSession();
+  }
+};
+
+/**
+ * POST /api/v1/orders/my/:id/cancel
+ * Customer cancels their own order (only if Pending, Paid, or Processing)
+ */
+export const cancelOrder = async (req: Request, res: Response) => {
+  try {
+    const order = await Order.findOne({ _id: req.params.id, customer: req.user!.id });
+    if (!order) return res.status(404).json({ message: "Order not found" });
+
+    const cancellableStatuses = ["Pending", "Paid", "Processing"];
+    if (!cancellableStatuses.includes(order.status)) {
+      return res.status(400).json({
+        message: `Cannot cancel an order that is "${order.status}". Only Pending, Paid, or Processing orders can be cancelled.`,
+      });
+    }
+
+    order.status = "Cancelled";
+    order.timeline.push({ status: "Cancelled", timestamp: new Date(), note: "Cancelled by customer" });
+    await order.save();
+
+    // Restore stock
+    const stockUpdates = order.items.map(item =>
+      Product.findByIdAndUpdate(item.product, { $inc: { stock: item.quantity } })
+    );
+    await Promise.allSettled(stockUpdates);
+
+    // Notify customer
+    const userRecord = await import("../../models/User").then(m =>
+      m.default.findById(req.user!.id).select("name email").lean()
+    );
+    const customerEmail = (userRecord as any)?.email;
+    const customerName = (userRecord as any)?.name || "Customer";
+    if (customerEmail) {
+      const { sendOrderStatusEmail } = await import("../../utils/sendOrderStatusEmail");
+      sendOrderStatusEmail({
+        to: customerEmail,
+        customerName,
+        orderId: order.orderId,
+        newStatus: "Cancelled",
+        note: "Cancelled by customer",
+      }).catch(() => {});
+    }
+
+    res.status(200).json({ message: "Order cancelled successfully", status: "Cancelled" });
+  } catch (error: any) {
+    res.status(500).json({
+      message: process.env.NODE_ENV === "production" ? "Internal Server Error" : error.message,
+    });
+  }
+};
+
+/**
+ * POST /api/v1/orders/my/:id/refund
+ * Customer requests a refund (only if Delivered)
+ */
+export const requestRefund = async (req: Request, res: Response) => {
+  try {
+    const order = await Order.findOne({ _id: req.params.id, customer: req.user!.id });
+    if (!order) return res.status(404).json({ message: "Order not found" });
+
+    if (order.status !== "Delivered") {
+      return res.status(400).json({
+        message: "Refund can only be requested for delivered orders.",
+      });
+    }
+
+    order.status = "Refunded";
+    order.timeline.push({ status: "Refunded", timestamp: new Date(), note: req.body.reason || "Refund requested by customer" });
+    await order.save();
+
+    // Notify customer
+    const userRecord = await import("../../models/User").then(m =>
+      m.default.findById(req.user!.id).select("name email").lean()
+    );
+    const customerEmail = (userRecord as any)?.email;
+    const customerName = (userRecord as any)?.name || "Customer";
+    if (customerEmail) {
+      const { sendOrderStatusEmail } = await import("../../utils/sendOrderStatusEmail");
+      sendOrderStatusEmail({
+        to: customerEmail,
+        customerName,
+        orderId: order.orderId,
+        newStatus: "Refunded",
+        note: req.body.reason || "Refund requested by customer",
+      }).catch(() => {});
+    }
+
+    res.status(200).json({ message: "Refund request submitted successfully", status: "Refunded" });
+  } catch (error: any) {
+    res.status(500).json({
+      message: process.env.NODE_ENV === "production" ? "Internal Server Error" : error.message,
+    });
   }
 };
 

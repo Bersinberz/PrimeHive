@@ -3,6 +3,7 @@ import { AuthProvider } from "./context/AuthContext";
 import { SettingsProvider } from "./context/SettingsContext";
 import { ToastProvider } from "./context/ToastContext";
 import { CartProvider } from "./context/CartContext";
+import { ThemeProvider } from "./context/ThemeContext";
 
 // Auth
 import AuthPage from "./pages/Auth";
@@ -21,6 +22,12 @@ import ContactPage from "./pages/User/Contact";
 import FAQPage from "./pages/User/FAQ";
 import ShippingPolicyPage from "./pages/User/ShippingPolicy";
 import ReturnsPage from "./pages/User/Returns";
+import SearchResults from "./pages/User/SearchResults";
+import BrowsePage from "./pages/User/Browse";
+import AccountPage from "./pages/User/Account";
+import VerifyEmail from "./pages/User/VerifyEmail";
+import PrivacyPolicy from "./pages/User/PrivacyPolicy";
+import TermsOfUse from "./pages/User/TermsOfUse";
 
 // Admin
 import AdminDashboard from "./pages/Admin/Dashboard";
@@ -33,17 +40,21 @@ import CategoryManagement from "./pages/Admin/CategoryManagement";
 import StaffManagement from "./pages/Admin/StaffManagement";
 import ProtectedRoute from "./components/ProtectedRoute";
 import ErrorBoundary from "./components/ErrorBoundary";
+import ScrollToTop from "./components/ScrollToTop";
 import MyProfile from "./pages/Admin/MyProfile";
 import StoreProfilePage from "./pages/Admin/StoreProfile";
 import StaffSettings from "./pages/Admin/StaffSettings";
+import OffersManagement from "./pages/Admin/OffersManagement";
 
 function App() {
   return (
+    <ThemeProvider>
     <SettingsProvider>
       <AuthProvider>
         <ToastProvider>
           <CartProvider>
             <BrowserRouter>
+              <ScrollToTop />
               <Routes>
                 {/* Auth */}
                 <Route path="/auth" element={<AuthPage />} />
@@ -62,7 +73,15 @@ function App() {
                   <Route path="/faq" element={<FAQPage />} />
                   <Route path="/shipping-policy" element={<ShippingPolicyPage />} />
                   <Route path="/returns" element={<ReturnsPage />} />
+                  <Route path="/search" element={<SearchResults />} />
+                  <Route path="/browse" element={<BrowsePage />} />
+                  <Route path="/account/*" element={<AccountPage />} />
+                  <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+                  <Route path="/terms-of-use" element={<TermsOfUse />} />
                 </Route>
+
+                {/* Standalone — no navbar */}
+                <Route path="/verify-email" element={<VerifyEmail />} />
 
                 {/* Admin */}
                 <Route path="/admin" element={<ProtectedRoute><ErrorBoundary><AdminLayout /></ErrorBoundary></ProtectedRoute>}>
@@ -77,6 +96,7 @@ function App() {
                   <Route path="profile"    element={<ProtectedRoute><MyProfile /></ProtectedRoute>} />
                   <Route path="store-profile" element={<ProtectedRoute allowedRoles={["staff"]}><StoreProfilePage /></ProtectedRoute>} />
                   <Route path="account-settings" element={<ProtectedRoute allowedRoles={["staff"]}><StaffSettings /></ProtectedRoute>} />
+                  <Route path="offers" element={<ProtectedRoute allowedRoles={["superadmin"]}><OffersManagement /></ProtectedRoute>} />
                 </Route>
               </Routes>
             </BrowserRouter>
@@ -84,6 +104,7 @@ function App() {
         </ToastProvider>
       </AuthProvider>
     </SettingsProvider>
+    </ThemeProvider>
   );
 }
 

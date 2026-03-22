@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import type { Product } from '../../../services/admin/productService';
 import { usePermission } from '../../../hooks/usePermission';
+import { useAuth } from '../../../context/AuthContext';
 
 interface ProductListProps {
   products: Product[];
@@ -10,18 +11,21 @@ interface ProductListProps {
   onAddFirst: () => void;
   onEdit: (product: Product) => void;
   onDelete: (product: Product) => void;
+  onPreview: (product: Product) => void;
   isFetchingMore?: boolean;
   hasMore?: boolean;
   onLoadMore?: () => void;
 }
 
 const ProductList: React.FC<ProductListProps> = ({
-  products, isLoading, searchQuery, onAddFirst, onEdit, onDelete,
+  products, isLoading, searchQuery, onAddFirst, onEdit, onDelete, onPreview,
   isFetchingMore = false, hasMore = false, onLoadMore
 }) => {
   const canEdit = usePermission('products', 'edit');
   const canDelete = usePermission('products', 'delete');
   const canCreate = usePermission('products', 'create');
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'superadmin';
 
   // Intersection Observer for Infinite Scroll
   const observerTarget = useRef<HTMLDivElement>(null);
@@ -170,6 +174,19 @@ const ProductList: React.FC<ProductListProps> = ({
 
               {/* Hover Action Tray */}
               <div className="card-action-tray">
+                {isSuperAdmin && (
+                <button
+                  className="action-btn"
+                  title="Preview"
+                  style={{ color: '#6366f1' }}
+                  onClick={(e) => { e.stopPropagation(); onPreview(p); }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                </button>
+                )}
                 {canEdit && (
                 <button
                   className="action-btn edit-btn"

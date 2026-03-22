@@ -31,11 +31,16 @@ import adminStaffRoutes from "./routes/admin/staffRoutes";
 import adminOrderRoutes from "./routes/admin/orderRoutes";
 import adminStatsRoutes from "./routes/admin/statsRoutes";
 import storeProfileRoutes from "./routes/admin/storeProfileRoutes";
+import adminOfferRoutes from "./routes/admin/offerRoutes";
+import adminCouponRoutes from "./routes/admin/couponRoutes";
 import publicSettingsRoutes from "./routes/publicSettingsRoutes";
 import storefrontProductRoutes from "./routes/storefront/productRoutes";
 import storefrontCategoryRoutes from "./routes/storefront/categoryRoutes";
 import storefrontCartRoutes from "./routes/storefront/cartRoutes";
 import storefrontOrderRoutes from "./routes/storefront/orderRoutes";
+import storefrontReviewRoutes from "./routes/storefront/reviewRoutes";
+import storefrontCouponRoutes from "./routes/storefront/couponRoutes";
+import storefrontOfferRoutes from "./routes/storefront/offerRoutes";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -117,7 +122,12 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 30,
-  message: "Too many auth requests. Please try again later."
+  message: "Too many auth requests. Please try again later.",
+  skip: (req) => {
+    // Only rate-limit actual auth actions, not profile/address reads
+    const strictPaths = ["/login", "/signup", "/refresh", "/set-password", "/resend-setup-email"];
+    return !strictPaths.some((p) => req.path.endsWith(p));
+  },
 });
 
 const adminLimiter = rateLimit({
@@ -146,6 +156,8 @@ app.use("/api/v1/admin/staff", adminLimiter, adminStaffRoutes);
 app.use("/api/v1/admin/orders", adminLimiter, adminOrderRoutes);
 app.use("/api/v1/admin/stats", statsLimiter, adminStatsRoutes);
 app.use("/api/v1/admin/store-profile", adminLimiter, storeProfileRoutes);
+app.use("/api/v1/admin/offers", adminLimiter, adminOfferRoutes);
+app.use("/api/v1/admin/coupons", adminLimiter, adminCouponRoutes);
 
 // ==========================================
 // Storefront Routes (Public + User)
@@ -160,7 +172,10 @@ const storefrontLimiter = rateLimit({
 app.use("/api/v1/products", storefrontLimiter, storefrontProductRoutes);
 app.use("/api/v1/categories", storefrontLimiter, storefrontCategoryRoutes);
 app.use("/api/v1/cart", storefrontLimiter, storefrontCartRoutes);
-app.use("/api/v1/orders", storefrontLimiter, storefrontOrderRoutes);
+app.use("/api/v1/orders",  storefrontLimiter, storefrontOrderRoutes);
+app.use("/api/v1/reviews", storefrontLimiter, storefrontReviewRoutes);
+app.use("/api/v1/coupons", storefrontLimiter, storefrontCouponRoutes);
+app.use("/api/v1/offers", storefrontLimiter, storefrontOfferRoutes);
 
 // ==========================================
 // Health Route
