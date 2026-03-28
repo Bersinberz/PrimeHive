@@ -3,9 +3,7 @@ import mongoose from "mongoose";
 import Order from "../../models/Order";
 import Product from "../../models/Product";
 import User from "../../models/User";
-import { redisGet, redisSet } from "../../config/redis";
-
-const CACHE_TTL = 2 * 60; // 2 minutes
+import { cacheGet, cacheSet, CACHE_TTL } from "../../utils/cache";
 
 /** Fill missing days for the last 7 days */
 const fillDays = (revenueByDay: any[], ordersPerDay: any[]) => {
@@ -36,8 +34,8 @@ const fillDays = (revenueByDay: any[], ordersPerDay: any[]) => {
 /** Superadmin: store-wide stats */
 const getSuperadminStats = async () => {
     const CACHE_KEY = "dashboard:stats";
-    const cached = await redisGet(CACHE_KEY);
-    if (cached) return JSON.parse(cached);
+    const cached = await cacheGet(CACHE_KEY);
+    if (cached) return cached;
 
     const now = new Date();
     const sevenDaysAgo = new Date(now);
@@ -102,15 +100,15 @@ const getSuperadminStats = async () => {
         ordersPerDay: filledOrdersPerDay,
     };
 
-    await redisSet(CACHE_KEY, JSON.stringify(data), CACHE_TTL);
+    await cacheSet(CACHE_KEY, data, CACHE_TTL.DASHBOARD_STATS);
     return data;
 };
 
 /** Staff: scoped stats — only products/orders belonging to this staff member */
 const getStaffStats = async (staffId: string) => {
     const CACHE_KEY = `dashboard:stats:${staffId}`;
-    const cached = await redisGet(CACHE_KEY);
-    if (cached) return JSON.parse(cached);
+    const cached = await cacheGet(CACHE_KEY);
+    if (cached) return cached;
 
     const now = new Date();
     const sevenDaysAgo = new Date(now);
@@ -222,7 +220,7 @@ const getStaffStats = async (staffId: string) => {
         ordersPerDay: filledOrdersPerDay,
     };
 
-    await redisSet(CACHE_KEY, JSON.stringify(data), CACHE_TTL);
+    await cacheSet(CACHE_KEY, data, CACHE_TTL.DASHBOARD_STATS);
     return data;
 };
 
@@ -234,6 +232,120 @@ export const getDashboardStats = async (req: Request, res: Response) => {
             ? await getSuperadminStats()
             : await getStaffStats(req.user!.id);
 
+        res.status(200).json(data);
+    } catch (error: any) {
+        res.status(500).json({
+            message: process.env.NODE_ENV === "production" ? "Internal Server Error" : error.message,
+        });
+    }
+};
+
+/**
+ * GET /admin/stats/advanced?range=7d|30d|90d&from=&to=
+ * Advanced analytics: AOV trend, top products by revenue/sales, customer acquisition, conversion
+ * Superadmin only
+ */
+export const getAdvancedStats = async (req: Request, res: Response) => {
+    try {
+        const range = (req.query.range as string) || "30d";
+        let from: Date;
+        let to: Date = new Date();
+
+        if (req.query.from && req.query.to) {
+            from = new Date(req.query.from as string);
+            to   = new Date(req.query.to as string);
+        } else {
+            const days = range === "7d" ? 7 : range === "90d" ? 90 : 30;
+            from = new Date();
+            from.setDate(from.getDate() - days);
+        }
+
+        const CACHE_KEY = `dashboard:advanced:${from.toISOString().split("T")[0]}:${to.toISOString().split("T")[0]}`;
+        const cached = await cacheGet(CACHE_KEY);
+        if (cached) return res.status(200).json(cached);
+
+        const dateMatch = { createdAt: { $gte: from, $lte: to } };
+        const activeMatch = { ...dateMatch, status: { $nin: ["Cancelled", "Refunded"] } };
+
+        const [
+            aovByDay,
+            topByRevenue,
+            topBySales,
+            newCustomers,
+            totalOrdersInRange,
+            uniqueCustomersInRange,
+        ] = await Promise.all([
+            // Average Order Value per day
+            Order.aggregate([
+                { $match: activeMatch },
+                { $group: {
+                    _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+                    totalRevenue: { $sum: "$totalAmount" },
+                    orderCount:   { $sum: 1 },
+                }},
+                { $project: { date: "$_id", aov: { $divide: ["$totalRevenue", "$orderCount"] }, orderCount: 1, totalRevenue: 1 } },
+                { $sort: { date: 1 } },
+            ]),
+            // Top 5 products by revenue
+            Order.aggregate([
+                { $match: activeMatch },
+                { $unwind: "$items" },
+                { $group: {
+                    _id: "$items.name",
+                    revenue: { $sum: { $multiply: ["$items.price", "$items.quantity"] } },
+                    units:   { $sum: "$items.quantity" },
+                }},
+                { $sort: { revenue: -1 } },
+                { $limit: 5 },
+            ]),
+            // Top 5 products by units sold
+            Order.aggregate([
+                { $match: activeMatch },
+                { $unwind: "$items" },
+                { $group: {
+                    _id: "$items.name",
+                    units:   { $sum: "$items.quantity" },
+                    revenue: { $sum: { $multiply: ["$items.price", "$items.quantity"] } },
+                }},
+                { $sort: { units: -1 } },
+                { $limit: 5 },
+            ]),
+            // New customers per day
+            User.aggregate([
+                { $match: { role: "user", createdAt: { $gte: from, $lte: to } } },
+                { $group: {
+                    _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+                    count: { $sum: 1 },
+                }},
+                { $sort: { _id: 1 } },
+            ]),
+            // Total orders in range (for conversion calc)
+            Order.countDocuments(dateMatch),
+            // Unique customers who ordered in range
+            Order.distinct("customer", { ...dateMatch, customer: { $ne: null } }),
+        ]);
+
+        const data = {
+            aovByDay: aovByDay.map(d => ({
+                date: d.date,
+                aov: Math.round(d.aov),
+                orders: d.orderCount,
+                revenue: d.totalRevenue,
+            })),
+            topByRevenue: topByRevenue.map(p => ({ name: p._id, revenue: p.revenue, units: p.units })),
+            topBySales:   topBySales.map(p => ({ name: p._id, units: p.units, revenue: p.revenue })),
+            customerAcquisition: newCustomers.map(d => ({ date: d._id, newCustomers: d.count })),
+            conversionFunnel: {
+                totalOrders:      totalOrdersInRange,
+                uniqueCustomers:  uniqueCustomersInRange.length,
+                avgOrdersPerCustomer: uniqueCustomersInRange.length > 0
+                    ? Math.round((totalOrdersInRange / uniqueCustomersInRange.length) * 100) / 100
+                    : 0,
+            },
+            range: { from: from.toISOString(), to: to.toISOString() },
+        };
+
+        await cacheSet(CACHE_KEY, data, CACHE_TTL.DASHBOARD_STATS);
         res.status(200).json(data);
     } catch (error: any) {
         res.status(500).json({

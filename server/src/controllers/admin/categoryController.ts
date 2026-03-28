@@ -290,7 +290,7 @@ export const updateCategory = async (req: Request, res: Response) => {
                 name: name.trim(),
                 description: description?.trim() || "",
             },
-            { new: true, runValidators: true }
+            { returnDocument: 'after', runValidators: true }
         );
 
         // Sync: if name changed, update all products that reference the old name

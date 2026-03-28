@@ -8,6 +8,9 @@ export const validateEnv = (): void => {
         "JWT_SECRET",
         "JWT_REFRESH_SECRET",
         "CLIENT_URL",
+        "SMTP_HOST",
+        "SMTP_USER",
+        "SMTP_PASS",
     ];
 
     const missing = required.filter((key) => !process.env[key]);
@@ -15,7 +18,7 @@ export const validateEnv = (): void => {
     if (missing.length > 0) {
         throw new Error(
             `Missing required environment variables: ${missing.join(", ")}\n` +
-            `Please check your .env file.`
+            `Please check your .env.development or .env.production file.`
         );
     }
 };

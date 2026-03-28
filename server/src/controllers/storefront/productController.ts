@@ -2,12 +2,9 @@ import { Request, Response } from "express";
 import Product from "../../models/Product";
 import Category from "../../models/Category";
 import Offer from "../../models/Offer";
-import { redisGet, redisSet } from "../../config/redis";
+import { cacheGet, cacheSet, CACHE_TTL } from "../../utils/cache";
 import { escapeRegex } from "../../utils/escapeRegex";
 import { buildStemFilter } from "../../utils/stemSearch";
-
-const CATEGORIES_CACHE_KEY = "storefront:categories";
-const CATEGORIES_TTL = 5 * 60; // 5 minutes
 
 function computeDiscountedPrice(price: number, discountType: string, discountValue: number): number {
   if (discountType === "percentage") return Math.round(price * (1 - discountValue / 100));
@@ -151,22 +148,13 @@ export const getProductById = async (req: Request, res: Response) => {
  */
 export const getCategories = async (req: Request, res: Response) => {
   try {
-    const cached = await redisGet(CATEGORIES_CACHE_KEY);
-    if (cached) {
-      return res.status(200).json(JSON.parse(cached));
-    }
+    const cached = await cacheGet<any[]>("storefront:categories");
+    if (cached) return res.status(200).json(cached);
 
-    const categories = await Category.find()
-      .select("name description")
-      .sort({ name: 1 })
-      .lean();
-
-    await redisSet(CATEGORIES_CACHE_KEY, JSON.stringify(categories), CATEGORIES_TTL);
-
+    const categories = await Category.find().select("name description").sort({ name: 1 }).lean();
+    await cacheSet("storefront:categories", categories, CACHE_TTL.CATEGORIES);
     res.status(200).json(categories);
   } catch (error: any) {
-    res.status(500).json({
-      message: process.env.NODE_ENV === "production" ? "Internal Server Error" : error.message,
-    });
+    res.status(500).json({ message: process.env.NODE_ENV === "production" ? "Internal Server Error" : error.message });
   }
 };

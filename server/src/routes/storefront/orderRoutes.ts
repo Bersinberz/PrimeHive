@@ -3,16 +3,15 @@ import { createOrder, getMyOrders, getMyOrderById, cancelOrder, requestRefund } 
 import { verifyToken } from "../../middleware/verifyToken";
 import { userOnly } from "../../middleware/userOnly";
 import { optionalAuth } from "../../middleware/optionalAuth";
+import { validate } from "../../middleware/validate";
+import { CreateOrderSchema, RefundRequestSchema } from "../../schemas/orderSchemas";
 
 const router = express.Router();
 
-// POST /orders — works for guests (optionalAuth) and logged-in users
-router.post("/", optionalAuth, createOrder);
-
-// My orders — requires auth
-router.get("/my", verifyToken, userOnly, getMyOrders);
-router.get("/my/:id", verifyToken, userOnly, getMyOrderById);
-router.post("/my/:id/cancel", verifyToken, userOnly, cancelOrder);
-router.post("/my/:id/refund", verifyToken, userOnly, requestRefund);
+router.post("/",             optionalAuth, validate(CreateOrderSchema), createOrder);
+router.get("/my",            verifyToken, userOnly, getMyOrders);
+router.get("/my/:id",        verifyToken, userOnly, getMyOrderById);
+router.post("/my/:id/cancel",verifyToken, userOnly, cancelOrder);
+router.post("/my/:id/refund",verifyToken, userOnly, validate(RefundRequestSchema), requestRefund);
 
 export default router;

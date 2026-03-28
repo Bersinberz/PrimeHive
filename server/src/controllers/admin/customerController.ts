@@ -70,7 +70,7 @@ export const updateCustomerStatus = async (req: Request, res: Response) => {
         const customer = await User.findOneAndUpdate(
             { _id: req.params.id, role: "user" },
             { status },
-            { new: true, runValidators: true }
+            { returnDocument: 'after', runValidators: true }
         ).select("-__v");
         if (!customer) return res.status(404).json({ message: "Customer not found." });
         res.status(200).json(customer);
@@ -113,7 +113,7 @@ export const updateCustomer = async (req: Request, res: Response) => {
         const customer = await User.findOneAndUpdate(
             { _id: req.params.id, role: "user" },
             updateData,
-            { new: true, runValidators: true }
+            { returnDocument: 'after', runValidators: true }
         ).select("-__v");
 
         if (req.file && oldProfilePicture) {
@@ -139,7 +139,7 @@ export const deleteCustomer = async (req: Request, res: Response) => {
         const customer = await User.findOneAndUpdate(
             { _id: req.params.id, role: "user" },
             { status: "deleted", deletedAt: new Date() },
-            { new: true }
+            { returnDocument: 'after' }
         );
         if (!customer) return res.status(404).json({ message: "Customer not found." });
         res.status(200).json({ message: "Customer deleted successfully." });
@@ -180,7 +180,7 @@ export const revokeCustomerDeletion = async (req: Request, res: Response) => {
         const customer = await User.findOneAndUpdate(
             { _id: req.params.id, role: "user", status: "deleted" },
             { status: "active", deletedAt: null },
-            { new: true }
+            { returnDocument: 'after' }
         ).select("-__v");
 
         if (!customer) return res.status(404).json({ message: "Customer not found or not in deleted state." });
@@ -274,3 +274,4 @@ export const getCustomerStats = async (req: Request, res: Response) => {
         });
     }
 };
+

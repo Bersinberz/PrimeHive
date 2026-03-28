@@ -56,3 +56,21 @@ export const getDashboardStats = async (): Promise<DashboardStats> => {
     const response = await axiosInstance.get("admin/stats");
     return response.data;
 };
+
+export interface AdvancedStats {
+    aovByDay: { date: string; aov: number; orders: number; revenue: number }[];
+    topByRevenue: { name: string; revenue: number; units: number }[];
+    topBySales: { name: string; units: number; revenue: number }[];
+    customerAcquisition: { date: string; newCustomers: number }[];
+    conversionFunnel: { totalOrders: number; uniqueCustomers: number; avgOrdersPerCustomer: number };
+    range: { from: string; to: string };
+}
+
+export const getAdvancedStats = async (params?: {
+    range?: "7d" | "30d" | "90d";
+    from?: string;
+    to?: string;
+}): Promise<AdvancedStats> => {
+    const response = await axiosInstance.get("admin/stats/advanced", { params });
+    return response.data;
+};

@@ -6,6 +6,10 @@ dotenv.config({
       : ".env.development"
 });
 
+// Sentry must be initialized before anything else
+import { initSentry, Sentry } from "./config/sentry";
+initSentry();
+
 // Validate env vars before anything else (#19)
 import { validateEnv } from "./utils/envValidation";
 validateEnv();
@@ -20,6 +24,7 @@ import morgan from "morgan";
 import logger from "./config/logger";
 import { connectRedis, disconnectRedis } from "./config/redis";
 
+import { errorHandler } from "./middleware/errorHandler";
 import { connectDB } from "./config/db";
 import { startPurgeJob } from "./jobs/purgeDeletedUsers";
 import authRoutes from "./routes/authRoutes";
@@ -33,6 +38,9 @@ import adminStatsRoutes from "./routes/admin/statsRoutes";
 import storeProfileRoutes from "./routes/admin/storeProfileRoutes";
 import adminOfferRoutes from "./routes/admin/offerRoutes";
 import adminCouponRoutes from "./routes/admin/couponRoutes";
+import adminReviewRoutes from "./routes/admin/reviewRoutes";
+import adminReturnRoutes from "./routes/admin/returnRoutes";
+import adminAuditLogRoutes from "./routes/admin/auditLogRoutes";
 import publicSettingsRoutes from "./routes/publicSettingsRoutes";
 import storefrontProductRoutes from "./routes/storefront/productRoutes";
 import storefrontCategoryRoutes from "./routes/storefront/categoryRoutes";
@@ -41,6 +49,9 @@ import storefrontOrderRoutes from "./routes/storefront/orderRoutes";
 import storefrontReviewRoutes from "./routes/storefront/reviewRoutes";
 import storefrontCouponRoutes from "./routes/storefront/couponRoutes";
 import storefrontOfferRoutes from "./routes/storefront/offerRoutes";
+import storefrontReturnRoutes from "./routes/storefront/returnRoutes";
+import storefrontWishlistRoutes from "./routes/storefront/wishlistRoutes";
+import paymentRoutes from "./routes/storefront/paymentRoutes";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -68,6 +79,10 @@ const sanitizeObject = (obj: Record<string, unknown>): Record<string, unknown> =
 app.use(helmet());
 app.use(compression());
 app.use(cookieParser());
+// Sentry request/tracing handlers (must be before routes)
+if (process.env.SENTRY_DSN) {
+  app.use(Sentry.expressErrorHandler());
+}
 
 // HTTP request logging (#16)
 if (process.env.NODE_ENV !== "production") {
@@ -156,8 +171,11 @@ app.use("/api/v1/admin/staff", adminLimiter, adminStaffRoutes);
 app.use("/api/v1/admin/orders", adminLimiter, adminOrderRoutes);
 app.use("/api/v1/admin/stats", statsLimiter, adminStatsRoutes);
 app.use("/api/v1/admin/store-profile", adminLimiter, storeProfileRoutes);
-app.use("/api/v1/admin/offers", adminLimiter, adminOfferRoutes);
-app.use("/api/v1/admin/coupons", adminLimiter, adminCouponRoutes);
+app.use("/api/v1/admin/offers",      adminLimiter, adminOfferRoutes);
+app.use("/api/v1/admin/coupons",     adminLimiter, adminCouponRoutes);
+app.use("/api/v1/admin/reviews",     adminLimiter, adminReviewRoutes);
+app.use("/api/v1/admin/returns",     adminLimiter, adminReturnRoutes);
+app.use("/api/v1/admin/audit-logs",  adminLimiter, adminAuditLogRoutes);
 
 // ==========================================
 // Storefront Routes (Public + User)
@@ -175,7 +193,10 @@ app.use("/api/v1/cart", storefrontLimiter, storefrontCartRoutes);
 app.use("/api/v1/orders",  storefrontLimiter, storefrontOrderRoutes);
 app.use("/api/v1/reviews", storefrontLimiter, storefrontReviewRoutes);
 app.use("/api/v1/coupons", storefrontLimiter, storefrontCouponRoutes);
-app.use("/api/v1/offers", storefrontLimiter, storefrontOfferRoutes);
+app.use("/api/v1/offers",  storefrontLimiter, storefrontOfferRoutes);
+app.use("/api/v1/returns",   storefrontLimiter, storefrontReturnRoutes);
+app.use("/api/v1/wishlist",  storefrontLimiter, storefrontWishlistRoutes);
+app.use("/api/v1/payments", storefrontLimiter, paymentRoutes);
 
 // ==========================================
 // Health Route
@@ -201,15 +222,7 @@ app.use((_req: Request, res: Response) => {
 // Global Error Handler
 // ==========================================
 
-app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-  logger.error("Unhandled Error:", err);
-  res.status(500).json({
-    message:
-      process.env.NODE_ENV === "production"
-        ? "Internal Server Error"
-        : err.message
-  });
-});
+app.use(errorHandler);
 
 // ==========================================
 // Start Server

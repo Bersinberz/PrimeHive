@@ -6,6 +6,7 @@ import { useCart } from "../../context/CartContext";
 import { useAuth } from "../../context/AuthContext";
 import { placeOrder } from "../../services/storefront/orderService";
 import type { ShippingAddress } from "../../services/storefront/orderService";
+import { createRazorpayOrder, verifyRazorpayPayment, loadRazorpayScript } from "../../services/storefront/paymentService";
 import { validateCoupon } from "../../services/storefront/couponService";
 import type { CouponValidationResult } from "../../services/storefront/couponService";
 import { getAddresses } from "../../services/storefront/accountService";
@@ -14,9 +15,8 @@ import { useSettings } from "../../context/SettingsContext";
 import PrimeLoader from "../../components/PrimeLoader";
 
 const PAYMENT_METHODS = [
-  { value: "COD", label: "Cash on Delivery" },
-  { value: "UPI", label: "UPI" },
-  { value: "Card", label: "Credit / Debit Card" },
+  { value: "Razorpay", label: "Pay Online", sub: "UPI, Cards, Net Banking, Wallets", icon: "💳" },
+  { value: "COD",      label: "Cash on Delivery", sub: "Pay when your order arrives", icon: "💵" },
 ];
 
 const INDIAN_STATES = [
@@ -152,6 +152,8 @@ const CheckoutPage: React.FC = () => {
 
     try {
       const orderItems = items.map((i) => ({ productId: i.product, quantity: i.quantity }));
+
+      // Step 1: Create the order in our DB (status = Pending)
       const result = await placeOrder({
         items: orderItems,
         shippingAddress,
@@ -159,10 +161,67 @@ const CheckoutPage: React.FC = () => {
         ...(isGuest ? { guestEmail } : {}),
         ...(appliedCoupon ? { couponId: appliedCoupon.couponId, couponDiscount: appliedCoupon.couponDiscount } : {}),
       });
+
+      // Step 2: If Razorpay, open payment modal
+      if (paymentMethod === "Razorpay") {
+        const loaded = await loadRazorpayScript();
+        if (!loaded) {
+          setServerError("Failed to load payment gateway. Please try again.");
+          setSubmitting(false);
+          return;
+        }
+
+        const rzpOrder = await createRazorpayOrder(result._id);
+
+        await new Promise<void>((resolve, reject) => {
+          const options = {
+            key:         rzpOrder.keyId,
+            amount:      rzpOrder.amount,
+            currency:    rzpOrder.currency,
+            name:        "PrimeHive",
+            description: `Order ${rzpOrder.orderRef}`,
+            order_id:    rzpOrder.razorpayOrderId,
+            prefill: {
+              name:    user?.name  || "",
+              email:   user?.email || guestEmail || "",
+              contact: (user as any)?.phone || "",
+            },
+            method: {
+              upi:        true,
+              card:       true,
+              netbanking: true,
+              wallet:     true,
+              emi:        false,
+            },
+            theme: { color: "#ff8c42" },
+            handler: async (response: any) => {
+              try {
+                await verifyRazorpayPayment({
+                  razorpay_order_id:   response.razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_signature:  response.razorpay_signature,
+                  orderId:             result._id,
+                });
+                resolve();
+              } catch {
+                reject(new Error("Payment verification failed. Contact support."));
+              }
+            },
+            modal: {
+              ondismiss: () => reject(new Error("Payment cancelled. Your order is saved — complete payment from My Orders.")),
+            },
+          };
+
+          const rzp = new (window as any).Razorpay(options);
+          rzp.open();
+        });
+      }
+
+      // Step 3: Clear cart and navigate
       await clearCart();
       navigate(`/order-confirmation/${result._id}`, { state: { order: result } });
     } catch (err: any) {
-      setServerError(err?.response?.data?.message || "Failed to place order. Please try again.");
+      setServerError(err?.message || err?.response?.data?.message || "Failed to place order. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -447,7 +506,16 @@ const CheckoutPage: React.FC = () => {
                       onChange={() => setPaymentMethod(pm.value)}
                       className="form-check-input m-0"
                       style={{ accentColor: "var(--prime-orange)" }} />
-                    <span className="fw-semibold" style={{ fontSize: "0.95rem" }}>{pm.label}</span>
+                    <div>
+                      <div className="d-flex align-items-center gap-2">
+                        <span style={{ fontSize: "1rem" }}>{pm.icon}</span>
+                        <span className="fw-bold" style={{ fontSize: "0.95rem" }}>{pm.label}</span>
+                        {pm.value === "Razorpay" && (
+                          <span className="badge rounded-pill fw-bold" style={{ background: "rgba(255,140,66,0.12)", color: "var(--prime-orange)", fontSize: "0.68rem" }}>Recommended</span>
+                        )}
+                      </div>
+                      <p className="mb-0 text-muted" style={{ fontSize: "0.78rem" }}>{pm.sub}</p>
+                    </div>
                   </label>
                 ))}
               </div>
@@ -584,9 +652,9 @@ const CheckoutPage: React.FC = () => {
                 disabled={submitting}
               >
                 {submitting ? (
-                  <><span className="spinner-border spinner-border-sm" /> Placing Order...</>
+                  <><span className="spinner-border spinner-border-sm" /> {paymentMethod === "Razorpay" ? "Preparing Payment..." : "Placing Order..."}</>
                 ) : (
-                  <><ShoppingBag size={16} /> Place Order</>
+                  <><ShoppingBag size={16} /> {paymentMethod === "Razorpay" ? "Proceed to Pay" : "Place Order"}</>
                 )}
               </motion.button>
             </div>

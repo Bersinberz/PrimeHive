@@ -73,9 +73,18 @@ export const updateOrderStatus = async (
     status: OrderStatus,
     note?: string
 ): Promise<Order> => {
-    const response = await axiosInstance.put(`admin/orders/status/${id}`, {
-        status,
-        note,
-    });
+    const response = await axiosInstance.put(`admin/orders/status/${id}`, { status, note });
+    return response.data;
+};
+
+// Get refund requests
+export const getRefundRequests = async (params?: { page?: number; limit?: number }): Promise<{ data: Order[]; pagination: any }> => {
+    const response = await axiosInstance.get("admin/orders/refunds", { params });
+    return response.data;
+};
+
+// Process refund decision
+export const processRefundDecision = async (id: string, decision: "approved" | "rejected", note?: string): Promise<Order> => {
+    const response = await axiosInstance.post(`admin/orders/${id}/refund-decision`, { decision, note });
     return response.data;
 };

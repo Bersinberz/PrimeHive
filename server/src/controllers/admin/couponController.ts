@@ -72,7 +72,7 @@ export const updateCoupon = async (req: Request, res: Response) => {
         ...(expiryDate !== undefined && { expiryDate }),
         ...(isActive !== undefined && { isActive }),
       },
-      { new: true }
+      { returnDocument: 'after' }
     );
     return res.json(updated);
   } catch (e: any) {
@@ -131,3 +131,4 @@ export const validateCoupon = async (req: Request, res: Response) => {
     return res.status(500).json({ message: e.message });
   }
 };
+

@@ -10,6 +10,8 @@ export type OrderStatus =
     | "Cancelled"
     | "Refunded";
 
+export type RefundStatus = "none" | "pending_refund" | "refunded" | "rejected";
+
 export interface IOrderItem {
     product: mongoose.Types.ObjectId;
     name: string;
@@ -42,6 +44,8 @@ export interface IOrder extends Document {
     paymentMethod: string;
     shippingAddress: IShippingAddress;
     status: OrderStatus;
+    refundStatus: RefundStatus;
+    refundReason?: string;
     timeline: ITimelineEvent[];
     couponCode?: string;
     couponDiscount?: number;
@@ -133,9 +137,20 @@ const OrderSchema = new Schema<IOrder>(
         },
         couponCode: { type: String },
         couponDiscount: { type: Number, min: 0 },
+        refundStatus: {
+            type: String,
+            enum: ["none", "pending_refund", "refunded", "rejected"],
+            default: "none",
+        },
+        refundReason: { type: String, trim: true, maxlength: 1000 },
     },
     { timestamps: true }
 );
+
+// Indexes — orderId unique index is already created by `unique: true` on the field
+OrderSchema.index({ customer: 1, createdAt: -1 });
+OrderSchema.index({ status: 1 });
+OrderSchema.index({ guestEmail: 1 });
 
 // Auto-generate orderId using atomic counter (race-condition safe)
 OrderSchema.pre("save", async function () {

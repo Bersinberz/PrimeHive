@@ -111,3 +111,11 @@ export const deleteMyAccount = async (password: string): Promise<void> => {
 export const revokeAllSessions = async (): Promise<void> => {
   await axiosInstance.post("/admin/settings/revoke-all-sessions");
 };
+
+export const forgotPasswordApi = async (email: string): Promise<void> => {
+  await axiosInstance.post("/auth/forgot-password", { email });
+};
+
+export const resetPasswordApi = async (token: string, newPassword: string): Promise<void> => {
+  await axiosInstance.post("/auth/reset-password", { token, newPassword });
+};

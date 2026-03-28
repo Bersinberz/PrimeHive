@@ -8,20 +8,12 @@ import User from "../../models/User";
  */
 export const getReviews = async (req: Request, res: Response) => {
   try {
-    const reviews = await Review.find({ product: req.params.productId })
-      .sort({ createdAt: -1 })
-      .lean();
+    const reviews = await Review.find({ product: req.params.productId, status: "approved" })
+      .sort({ createdAt: -1 }).lean();
 
     const total = reviews.length;
-    const avg = total
-      ? Math.round((reviews.reduce((s, r) => s + r.rating, 0) / total) * 10) / 10
-      : 0;
-
-    // rating distribution
-    const dist = [5, 4, 3, 2, 1].map(star => ({
-      star,
-      count: reviews.filter(r => r.rating === star).length,
-    }));
+    const avg = total ? Math.round((reviews.reduce((s, r) => s + r.rating, 0) / total) * 10) / 10 : 0;
+    const dist = [5,4,3,2,1].map(star => ({ star, count: reviews.filter(r => r.rating === star).length }));
 
     res.json({ reviews, avg, total, dist });
   } catch {

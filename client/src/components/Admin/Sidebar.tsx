@@ -38,6 +38,11 @@ const Sidebar: React.FC = () => {
     { name: 'Customers',  path: '/admin/customers',  module: 'customers'  as keyof Permissions, superAdminOnly: true, icon: <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /> },
     { name: 'Staff',      path: '/admin/staff',      module: 'staff'      as keyof Permissions, superAdminOnly: true, icon: <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></> },
     { name: 'Offers & Coupons', path: '/admin/offers', module: 'dashboard' as keyof Permissions, superAdminOnly: true, icon: <><path d="M9 14l6-6" /><circle cx="9.5" cy="9.5" r="0.5" fill="currentColor" /><circle cx="14.5" cy="14.5" r="0.5" fill="currentColor" /><path d="M2 12C2 6.48 6.48 2 12 2s10 4.48 10 10-4.48 10-10 10S2 17.52 2 12z" /></> },
+    { name: 'Reviews',    path: '/admin/reviews',   module: 'dashboard' as keyof Permissions, superAdminOnly: true, icon: <><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></> },
+    { name: 'Returns',    path: '/admin/returns',   module: 'orders'     as keyof Permissions, icon: <><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 .49-3.5" /></> },
+    { name: 'Audit Log',  path: '/admin/audit-log', module: 'dashboard' as keyof Permissions, superAdminOnly: true, icon: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" /></> },
+    { name: 'Analytics',  path: '/admin/analytics', module: 'dashboard' as keyof Permissions, superAdminOnly: true, icon: <><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" /></> },
+    { name: 'Bulk Import', path: '/admin/bulk-products', module: 'products' as keyof Permissions, icon: <><polyline points="16 16 12 12 8 16" /><line x1="12" y1="12" x2="12" y2="21" /><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" /></> },
     { name: 'Settings',   path: '/admin/settings',   module: 'settings'   as keyof Permissions, superAdminOnly: true, icon: <><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" /></> },
     { name: 'Store Profile', path: '/admin/store-profile', module: 'dashboard' as keyof Permissions, staffOnly: true, icon: <><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></> },
     { name: 'Account Settings', path: '/admin/account-settings', module: 'dashboard' as keyof Permissions, staffOnly: true, icon: <><circle cx="12" cy="8" r="4" /><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" /></> },
@@ -55,8 +60,8 @@ const Sidebar: React.FC = () => {
 
   return (
     <div
-      className="d-none d-lg-flex flex-column flex-shrink-0 p-3 shadow-lg text-white"
-      style={{ width: '280px', height: '100%', backgroundColor: '#0f172a', borderRight: '1px solid #1e293b' }}
+      className="d-none d-lg-flex flex-column flex-shrink-0 shadow-lg text-white"
+      style={{ width: '280px', height: '100%', backgroundColor: '#0f172a', borderRight: '1px solid #1e293b', overflow: 'hidden' }}
     >
       {/* Logout overlay */}
       {loggingOut && (
@@ -66,7 +71,7 @@ const Sidebar: React.FC = () => {
           <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
       )}
-      <div className="d-flex align-items-center mb-5 mt-3 px-3">
+      <div className="d-flex align-items-center px-4 py-4 flex-shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         <img
           src={Logo}
           alt={`${storeName} Logo`}
@@ -83,7 +88,7 @@ const Sidebar: React.FC = () => {
         </span>
       </div>
 
-      <ul className="nav nav-pills flex-column mb-auto gap-2 px-2">
+      <ul className="nav nav-pills flex-column gap-1 px-3 py-3" style={{ overflowY: 'auto', flex: 1, scrollbarWidth: 'none' }}>
         {menuItems.map((item) => {
           const isActive = location.pathname.includes(item.path);
 
@@ -91,7 +96,7 @@ const Sidebar: React.FC = () => {
             <li className="nav-item" key={item.name}>
               <Link
                 to={item.path}
-                className={`nav-link d-flex align-items-center gap-3 w-100 text-start border-0 py-3 text-decoration-none ${isActive ? 'fw-bold text-white shadow-sm' : 'text-white-50 hover-text-white'}`}
+                className={`nav-link d-flex align-items-center gap-3 w-100 text-start border-0 py-2 text-decoration-none ${isActive ? 'fw-bold text-white shadow-sm' : 'text-white-50 hover-text-white'}`}
                 style={{
                   backgroundColor: isActive ? 'rgba(255, 140, 66, 0.15)' : 'transparent',
                   color: isActive ? 'var(--prime-deep, #ff8c42)' : '',
@@ -109,7 +114,7 @@ const Sidebar: React.FC = () => {
         })}
       </ul>
 
-      <div className="mt-auto px-2 pb-2">
+      <div className="px-3 pb-3 pt-2 flex-shrink-0" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
         <div className="p-3 rounded-4" style={{ backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.05)' }}>
           <div className="d-flex align-items-center text-white text-decoration-none">
             <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', flex: 1, minWidth: 0, gap: '12px' }} onClick={() => navigate(isSuperAdmin ? '/admin/profile' : '/admin/account-settings')}>

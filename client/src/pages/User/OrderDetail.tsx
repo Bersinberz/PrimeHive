@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Package, MapPin, CreditCard, Tag, CheckCircle2, Clock, Circle, XCircle, RotateCcw, AlertTriangle } from "lucide-react";
+import {
+  ArrowLeft, Package, MapPin, CreditCard, Tag,
+  XCircle, RotateCcw, AlertTriangle,
+  ShoppingBag, CreditCard as PayIcon, Settings, Truck, CheckCircle2,
+} from "lucide-react";
 import { getMyOrderById, cancelOrder, requestRefund } from "../../services/storefront/orderService";
 import type { MyOrder } from "../../services/storefront/orderService";
 
@@ -15,8 +19,13 @@ const STATUS_META: Record<string, { bg: string; color: string; dot: string }> = 
   Refunded:   { bg: "rgba(107,114,128,0.1)", color: "#6b7280", dot: "#9ca3af" },
 };
 
-// Ordered pipeline for progress display
-const PIPELINE = ["Pending", "Paid", "Processing", "Shipped", "Delivered"];
+const PIPELINE: { key: string; label: string; sub: string; Icon: React.FC<any> }[] = [
+  { key: "Pending",    label: "Order Placed",   sub: "We've received your order",     Icon: ShoppingBag },
+  { key: "Paid",       label: "Payment Done",   sub: "Payment confirmed",             Icon: PayIcon },
+  { key: "Processing", label: "Processing",     sub: "Preparing your items",          Icon: Settings },
+  { key: "Shipped",    label: "Shipped",        sub: "On the way to you",             Icon: Truck },
+  { key: "Delivered",  label: "Delivered",      sub: "Enjoy your purchase!",          Icon: CheckCircle2 },
+];
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(n);
@@ -100,8 +109,7 @@ const OrderDetailPage: React.FC = () => {
     ? order.timeline
     : [{ status: order.status, timestamp: order.createdAt }];
 
-  // Progress pipeline index
-  const pipelineIdx = PIPELINE.indexOf(order.status);
+  const pipelineIdx = PIPELINE.findIndex(p => p.key === order.status);
 
   const addr = order.shippingAddress;
 
@@ -130,55 +138,101 @@ const OrderDetailPage: React.FC = () => {
         </span>
       </div>
 
-      {/* Progress bar (only for non-cancelled) */}
+      {/* Amazon-style stepper */}
       {!isCancelledOrRefunded && pipelineIdx >= 0 && (
-        <div className="form-panel mb-4 py-4">
-          <div className="d-flex align-items-center justify-content-between position-relative">
-            {/* Connector line */}
+        <div className="form-panel mb-4" style={{ padding: '28px 24px' }}>
+          <div style={{ position: 'relative' }}>
+            {/* Background track */}
             <div style={{
-              position: "absolute", top: 16, left: "5%", right: "5%", height: 3,
-              background: "var(--bg-surface-3)", borderRadius: 4, zIndex: 0,
+              position: 'absolute', top: 22, left: '10%', right: '10%', height: 3,
+              background: 'var(--bg-surface-3)', borderRadius: 4, zIndex: 0,
             }} />
-            <div style={{
-              position: "absolute", top: 16, left: "5%",
-              width: `${Math.min(100, (pipelineIdx / (PIPELINE.length - 1)) * 90)}%`,
-              height: 3, background: "var(--prime-gradient)", borderRadius: 4, zIndex: 1,
-              transition: "width 0.6s ease",
-            }} />
+            {/* Filled track */}
+            <motion.div
+              initial={{ width: 0 }}
+              animate={{ width: `${(pipelineIdx / (PIPELINE.length - 1)) * 80}%` }}
+              transition={{ duration: 0.8, ease: 'easeOut' }}
+              style={{
+                position: 'absolute', top: 22, left: '10%', height: 3,
+                background: 'var(--prime-gradient)', borderRadius: 4, zIndex: 1,
+              }}
+            />
 
-            {PIPELINE.map((step, idx) => {
-              const done = idx < pipelineIdx;
-              const active = idx === pipelineIdx;
-              return (
-                <div key={step} className="d-flex flex-column align-items-center gap-2" style={{ zIndex: 2, flex: 1 }}>
-                  <motion.div
-                    initial={{ scale: 0.8 }} animate={{ scale: 1 }}
-                    className="d-flex align-items-center justify-content-center rounded-circle"
-                    style={{
-                      width: 34, height: 34,
-                      background: done || active ? "var(--prime-gradient)" : "var(--bg-surface-3)",
-                      border: active ? "3px solid var(--prime-orange)" : "none",
-                      boxShadow: active ? "0 0 0 4px rgba(255,140,66,0.15)" : "none",
-                      transition: "all 0.3s",
-                    }}
-                  >
-                    {done
-                      ? <CheckCircle2 size={16} color="#fff" />
-                      : active
-                        ? <Clock size={14} color="#fff" />
-                        : <Circle size={14} color="var(--text-muted)" />
-                    }
-                  </motion.div>
-                  <span style={{
-                    fontSize: "0.7rem", fontWeight: active ? 800 : 600,
-                    color: active ? "var(--prime-orange)" : done ? "var(--text-secondary)" : "var(--text-muted)",
-                    textAlign: "center", lineHeight: 1.2,
-                  }}>
-                    {step}
-                  </span>
-                </div>
-              );
-            })}
+            <div className="d-flex justify-content-between" style={{ position: 'relative', zIndex: 2 }}>
+              {PIPELINE.map(({ key, label, sub, Icon }, idx) => {
+                const done   = idx < pipelineIdx;
+                const active = idx === pipelineIdx;
+                const future = idx > pipelineIdx;
+                // Find timestamp for this step from timeline
+                const event = order.timeline?.find(t => t.status === key);
+
+                return (
+                  <div key={key} className="d-flex flex-column align-items-center" style={{ flex: 1, gap: 10 }}>
+                    {/* Icon circle */}
+                    <motion.div
+                      initial={{ scale: 0.7, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ delay: idx * 0.08 }}
+                      style={{
+                        width: 44, height: 44, borderRadius: '50%',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: done ? 'var(--prime-gradient)' : active ? 'var(--prime-gradient)' : 'var(--bg-surface-3)',
+                        border: active ? '3px solid var(--prime-orange)' : '3px solid transparent',
+                        boxShadow: active ? '0 0 0 5px rgba(255,140,66,0.15)' : done ? '0 2px 8px rgba(255,140,66,0.25)' : 'none',
+                        transition: 'all 0.3s',
+                      }}
+                    >
+                      <Icon size={18} color={future ? 'var(--text-muted)' : '#fff'} />
+                    </motion.div>
+
+                    {/* Label */}
+                    <div className="text-center" style={{ maxWidth: 90 }}>
+                      <p style={{
+                        margin: 0, fontSize: '0.78rem', fontWeight: active ? 800 : done ? 700 : 500,
+                        color: active ? 'var(--prime-orange)' : done ? 'var(--text-primary)' : 'var(--text-muted)',
+                        lineHeight: 1.3,
+                      }}>
+                        {label}
+                      </p>
+                      {event ? (
+                        <p style={{ margin: '3px 0 0', fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+                          {new Date(event.timestamp).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                        </p>
+                      ) : (
+                        <p style={{ margin: '3px 0 0', fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 400 }}>
+                          {future ? sub : ''}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Active step description */}
+          <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border-color)', textAlign: 'center' }}>
+            <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+              {PIPELINE[pipelineIdx]?.sub}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Cancelled / Refunded banner */}
+      {isCancelledOrRefunded && (
+        <div className="form-panel mb-4 d-flex align-items-center gap-3"
+          style={{ background: order.status === 'Cancelled' ? 'rgba(239,68,68,0.05)' : 'rgba(107,114,128,0.05)', border: `1.5px solid ${order.status === 'Cancelled' ? 'rgba(239,68,68,0.2)' : 'rgba(107,114,128,0.2)'}` }}>
+          <div style={{ width: 40, height: 40, borderRadius: '50%', background: order.status === 'Cancelled' ? 'rgba(239,68,68,0.1)' : 'rgba(107,114,128,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            {order.status === 'Cancelled' ? <XCircle size={20} color="#dc2626" /> : <RotateCcw size={20} color="#6b7280" />}
+          </div>
+          <div>
+            <p style={{ margin: 0, fontWeight: 800, fontSize: '0.95rem', color: order.status === 'Cancelled' ? '#dc2626' : '#6b7280' }}>
+              Order {order.status}
+            </p>
+            <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+              {order.timeline?.slice(-1)[0]?.note || ''}
+            </p>
           </div>
         </div>
       )}
@@ -219,55 +273,58 @@ const OrderDetailPage: React.FC = () => {
             ))}
           </div>
 
-          {/* Timeline */}
+          {/* Activity Log */}
           <div className="form-panel">
-            <p className="mb-4 fw-bold" style={{ fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.7px", color: "var(--text-muted)" }}>
-              Order Timeline
+            <p className="mb-3 fw-bold" style={{ fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.7px", color: "var(--text-muted)" }}>
+              Activity
             </p>
-            <div className="position-relative">
-              {/* Vertical line */}
-              <div style={{
-                position: "absolute", left: 11, top: 8, bottom: 8,
-                width: 2, background: "var(--bg-surface-3)", borderRadius: 2,
-              }} />
-              <div className="d-flex flex-column gap-4">
-                {timeline.map((event, idx) => {
-                  const es = STATUS_META[event.status] || STATUS_META.Pending;
-                  const isLatest = idx === timeline.length - 1;
-                  return (
-                    <motion.div
-                      key={idx}
-                      initial={{ opacity: 0, x: -8 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: idx * 0.06 }}
-                      className="d-flex align-items-start gap-3"
-                      style={{ position: "relative", zIndex: 1 }}
-                    >
-                      {/* Dot */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+              {[...timeline].reverse().map((event, idx) => {
+                const es = STATUS_META[event.status] || STATUS_META.Pending;
+                const isFirst = idx === 0;
+                return (
+                  <motion.div
+                    key={idx}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.05 }}
+                    style={{ display: 'flex', gap: 14, paddingBottom: 20, position: 'relative' }}
+                  >
+                    {/* Vertical connector */}
+                    {idx < timeline.length - 1 && (
                       <div style={{
-                        width: 24, height: 24, borderRadius: "50%", flexShrink: 0,
-                        background: isLatest ? es.dot : "var(--bg-surface-3)",
-                        border: `2px solid ${isLatest ? es.dot : "var(--border-color)"}`,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        boxShadow: isLatest ? `0 0 0 4px ${es.dot}22` : "none",
-                      }}>
-                        {isLatest && <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#fff" }} />}
-                      </div>
-                      <div className="flex-grow-1 pb-1">
-                        <p className="mb-0 fw-bold" style={{ fontSize: "0.9rem", color: isLatest ? es.color : "var(--text-secondary)" }}>
+                        position: 'absolute', left: 11, top: 24, bottom: 0,
+                        width: 2, background: 'var(--bg-surface-3)',
+                      }} />
+                    )}
+                    {/* Dot */}
+                    <div style={{
+                      width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
+                      background: isFirst ? es.dot : 'var(--bg-surface-3)',
+                      border: `2px solid ${isFirst ? es.dot : 'var(--border-color)'}`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      boxShadow: isFirst ? `0 0 0 4px ${es.dot}22` : 'none',
+                      zIndex: 1,
+                    }}>
+                      {isFirst && <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#fff' }} />}
+                    </div>
+                    {/* Content */}
+                    <div style={{ flex: 1, paddingTop: 2 }}>
+                      <div className="d-flex align-items-center justify-content-between gap-2 flex-wrap">
+                        <span style={{ fontWeight: 700, fontSize: '0.88rem', color: isFirst ? es.color : 'var(--text-secondary)' }}>
                           {event.status}
-                        </p>
-                        {event.note && (
-                          <p className="mb-0" style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>{event.note}</p>
-                        )}
-                        <p className="mb-0" style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                        </span>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
                           {fmtDate(event.timestamp)}
-                        </p>
+                        </span>
                       </div>
-                    </motion.div>
-                  );
-                })}
-              </div>
+                      {event.note && (
+                        <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: 'var(--text-muted)' }}>{event.note}</p>
+                      )}
+                    </div>
+                  </motion.div>
+                );
+              })}
             </div>
           </div>
         </div>

@@ -2,177 +2,147 @@ import { Request, Response } from "express";
 import Order from "../../models/Order";
 import Product from "../../models/Product";
 import mongoose from "mongoose";
+import { asyncHandler } from "../../utils/asyncHandler";
 import { sendOrderStatusEmail } from "../../utils/sendOrderStatusEmail";
 
-/**
- * Get All Orders (admin list view — paginated with search)
- * Superadmin: all orders
- * Staff: only orders containing products they created
- */
-export const getOrders = async (req: Request, res: Response) => {
-    try {
-        const page = Math.max(1, parseInt(req.query.page as string) || 1);
-        const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 50));
-        const search = (req.query.search as string || "").trim();
-        const skip = (page - 1) * limit;
+export const getOrders = asyncHandler(async (req: Request, res: Response) => {
+  const page  = Math.max(1, parseInt(req.query.page as string) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 50));
+  const search = (req.query.search as string || "").trim();
+  const skip  = (page - 1) * limit;
 
-        const filter: any = {};
-        if (search) {
-            filter.orderId = { $regex: search, $options: "i" };
-        }
+  const filter: any = {};
+  if (search) filter.orderId = { $regex: search, $options: "i" };
 
-        // Staff: scope to orders that contain their products
-        if (req.user?.role === "staff") {
-            const staffProductIds = await Product.find({ createdBy: new mongoose.Types.ObjectId(req.user.id) })
-                .select("_id")
-                .lean()
-                .then(ps => ps.map(p => p._id));
-
-            if (staffProductIds.length === 0) {
-                return res.status(200).json({ data: [], pagination: { page, limit, total: 0, totalPages: 0 } });
-            }
-            filter["items.product"] = { $in: staffProductIds };
-        }
-
-        const [orders, total] = await Promise.all([
-            Order.find(filter)
-                .sort({ createdAt: -1 })
-                .skip(skip)
-                .limit(limit)
-                .populate("customer", "name email phone")
-                .select("orderId customer items totalAmount paymentMethod status createdAt"),
-            Order.countDocuments(filter),
-        ]);
-
-        res.status(200).json({
-            data: orders,
-            pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
-        });
-    } catch (error: any) {
-        res.status(500).json({
-            message: process.env.NODE_ENV === "production" ? "Internal Server Error" : error.message,
-        });
+  if (req.user?.role === "staff") {
+    const staffProductIds = await Product.find({ createdBy: new mongoose.Types.ObjectId(req.user.id) })
+      .select("_id").lean().then(ps => ps.map(p => p._id));
+    if (staffProductIds.length === 0) {
+      return res.status(200).json({ data: [], pagination: { page, limit, total: 0, totalPages: 0 } });
     }
-};
+    filter["items.product"] = { $in: staffProductIds };
+  }
 
-/**
- * Get Single Order By ID (admin detail view)
- */
-export const getOrderById = async (req: Request, res: Response) => {
-    try {
-        const order = await Order.findById(req.params.id)
-            .populate("customer", "name email phone")
-            .populate("items.product", "name images");
+  const [orders, total] = await Promise.all([
+    Order.find(filter)
+      .sort({ createdAt: -1 }).skip(skip).limit(limit)
+      .populate("customer", "name email phone")
+      .select("orderId customer items totalAmount paymentMethod status createdAt refundStatus refundReason"),
+    Order.countDocuments(filter),
+  ]);
 
-        if (!order) {
-            return res.status(404).json({ message: "Order not found" });
-        }
+  res.status(200).json({ data: orders, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
+});
 
-        res.status(200).json(order);
-    } catch (error: any) {
-        res.status(500).json({
-            message:
-                process.env.NODE_ENV === "production"
-                    ? "Internal Server Error"
-                    : error.message,
-        });
+export const getOrderById = asyncHandler(async (req: Request, res: Response) => {
+  const order = await Order.findById(req.params.id)
+    .populate("customer", "name email phone")
+    .populate("items.product", "name images");
+  if (!order) return res.status(404).json({ message: "Order not found" });
+  res.status(200).json(order);
+});
+
+export const updateOrderStatus = asyncHandler(async (req: Request, res: Response) => {
+  const { status, note } = req.body;
+  const validStatuses = ["Pending","Paid","Processing","Shipped","Delivered","Cancelled","Refunded"];
+
+  if (!status || !validStatuses.includes(status)) {
+    return res.status(400).json({ message: "Invalid status. Must be one of: " + validStatuses.join(", ") });
+  }
+
+  const order = await Order.findById(req.params.id);
+  if (!order) return res.status(404).json({ message: "Order not found" });
+  if (order.status === status) return res.status(400).json({ message: `Order is already "${status}".` });
+  if (["Cancelled","Refunded","Delivered"].includes(order.status)) {
+    return res.status(400).json({ message: `Cannot change status from "${order.status}". This order is finalized.` });
+  }
+
+  const previousStatus = order.status;
+  order.status = status;
+  order.timeline.push({ status, timestamp: new Date(), note: note || undefined });
+  await order.save();
+
+  if ((status === "Cancelled" || status === "Refunded") && !["Cancelled","Refunded"].includes(previousStatus)) {
+    await Promise.allSettled(order.items.map(item =>
+      Product.findByIdAndUpdate(item.product, { $inc: { stock: item.quantity } })
+    ));
+  }
+
+  const updatedOrder = await Order.findById(order._id).populate("customer", "name email phone");
+  res.status(200).json(updatedOrder);
+
+  const customerEmail = (updatedOrder?.customer as any)?.email || order.guestEmail;
+  const customerName  = (updatedOrder?.customer as any)?.name  || "Customer";
+  if (customerEmail) {
+    sendOrderStatusEmail({ to: customerEmail, customerName, orderId: order.orderId, newStatus: status, note: note || undefined }).catch(() => {});
+  }
+});
+
+/** GET /admin/orders/refunds — list all pending_refund orders */
+export const getRefundRequests = asyncHandler(async (req: Request, res: Response) => {
+  const page  = Math.max(1, parseInt(req.query.page as string) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 50));
+  const skip  = (page - 1) * limit;
+
+  const filter: any = { refundStatus: "pending_refund" };
+
+  if (req.user?.role === "staff") {
+    const staffProductIds = await Product.find({ createdBy: new mongoose.Types.ObjectId(req.user.id) })
+      .select("_id").lean().then(ps => ps.map(p => p._id));
+    if (staffProductIds.length === 0) {
+      return res.status(200).json({ data: [], pagination: { page, limit, total: 0, totalPages: 0 } });
     }
-};
+    filter["items.product"] = { $in: staffProductIds };
+  }
 
-/**
- * Update Order Status
- * Body: { status: OrderStatus, note?: string }
- *
- * Side effects:
- *  - Pushes a new timeline event
- *  - If Cancelled/Refunded → restores product stock
- */
-export const updateOrderStatus = async (req: Request, res: Response) => {
-    try {
-        const { status, note } = req.body;
+  const [orders, total] = await Promise.all([
+    Order.find(filter)
+      .sort({ updatedAt: -1 }).skip(skip).limit(limit)
+      .populate("customer", "name email phone")
+      .select("orderId customer items totalAmount status refundStatus refundReason createdAt updatedAt"),
+    Order.countDocuments(filter),
+  ]);
 
-        const validStatuses = [
-            "Pending", "Paid", "Processing", "Shipped",
-            "Delivered", "Cancelled", "Refunded",
-        ];
+  res.status(200).json({ data: orders, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
+});
 
-        if (!status || !validStatuses.includes(status)) {
-            return res.status(400).json({
-                message: "Invalid status. Must be one of: " + validStatuses.join(", "),
-            });
-        }
+/** POST /admin/orders/:id/refund-decision — approve or reject a refund */
+export const processRefundDecision = asyncHandler(async (req: Request, res: Response) => {
+  const { decision, note } = req.body; // decision: "approved" | "rejected"
+  if (!["approved","rejected"].includes(decision)) {
+    return res.status(400).json({ message: "decision must be 'approved' or 'rejected'" });
+  }
 
-        const order = await Order.findById(req.params.id);
+  const order = await Order.findById(req.params.id).populate("customer", "name email");
+  if (!order) return res.status(404).json({ message: "Order not found" });
+  if (order.refundStatus !== "pending_refund") {
+    return res.status(400).json({ message: "This order does not have a pending refund request." });
+  }
 
-        if (!order) {
-            return res.status(404).json({ message: "Order not found" });
-        }
+  if (decision === "approved") {
+    order.status = "Refunded";
+    order.refundStatus = "refunded";
+    order.timeline.push({ status: "Refunded", timestamp: new Date(), note: note || "Refund approved by admin" });
+    // Restore stock
+    await Promise.allSettled(order.items.map(item =>
+      Product.findByIdAndUpdate(item.product, { $inc: { stock: item.quantity } })
+    ));
+  } else {
+    order.refundStatus = "rejected";
+    order.timeline.push({ status: order.status, timestamp: new Date(), note: note || "Refund request rejected by admin" });
+  }
 
-        // Prevent updating status if already the same
-        if (order.status === status) {
-            return res.status(400).json({
-                message: `Order is already "${status}".`,
-            });
-        }
+  await order.save();
 
-        // Prevent updating a terminal status
-        if (["Cancelled", "Refunded", "Delivered"].includes(order.status)) {
-            return res.status(400).json({
-                message: `Cannot change status from "${order.status}". This order is finalized.`,
-            });
-        }
+  const customerEmail = (order.customer as any)?.email || order.guestEmail;
+  const customerName  = (order.customer as any)?.name  || "Customer";
+  if (customerEmail) {
+    const statusLabel = decision === "approved" ? "Refunded" : order.status;
+    const emailNote   = decision === "approved"
+      ? (note || "Your refund has been approved.")
+      : (note || "Your refund request has been reviewed and could not be approved at this time.");
+    sendOrderStatusEmail({ to: customerEmail, customerName, orderId: order.orderId, newStatus: statusLabel, note: emailNote }).catch(() => {});
+  }
 
-        const previousStatus = order.status;
-
-        // Update status & push timeline entry
-        order.status = status;
-        order.timeline.push({
-            status,
-            timestamp: new Date(),
-            note: note || undefined,
-        });
-
-        await order.save();
-
-        // Side effect: restore stock when cancelled or refunded
-        if (
-            (status === "Cancelled" || status === "Refunded") &&
-            !["Cancelled", "Refunded"].includes(previousStatus)
-        ) {
-            const stockUpdates = order.items.map((item) =>
-                Product.findByIdAndUpdate(item.product, {
-                    $inc: { stock: item.quantity },
-                })
-            );
-            await Promise.allSettled(stockUpdates);
-        }
-
-        // Return the updated order with populated customer
-        const updatedOrder = await Order.findById(order._id)
-            .populate("customer", "name email phone");
-
-        res.status(200).json(updatedOrder);
-
-        // Fire-and-forget: send status update email to customer
-        const customerEmail =
-            (updatedOrder?.customer as any)?.email || order.guestEmail;
-        const customerName = (updatedOrder?.customer as any)?.name || "Customer";
-
-        if (customerEmail) {
-            sendOrderStatusEmail({
-                to: customerEmail,
-                customerName,
-                orderId: order.orderId,
-                newStatus: status,
-                note: note || undefined,
-            }).catch(() => { /* already logged inside */ });
-        }
-    } catch (error: any) {
-        res.status(500).json({
-            message:
-                process.env.NODE_ENV === "production"
-                    ? "Internal Server Error"
-                    : error.message,
-        });
-    }
-};
+  res.status(200).json({ message: `Refund ${decision}`, order });
+});

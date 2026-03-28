@@ -37,6 +37,8 @@ export interface IUser extends Document {
   isPasswordSet: boolean;
   passwordSetToken?: string;
   passwordSetExpires?: Date;
+  forgotPasswordToken?: string;
+  forgotPasswordExpires?: Date;
   emailVerified: boolean;
   emailVerificationToken?: string;
   emailVerificationExpires?: Date;
@@ -120,6 +122,14 @@ const userSchema = new mongoose.Schema<IUser>(
       type: Date,
       select: false,
     },
+    forgotPasswordToken: {
+      type: String,
+      select: false,
+    },
+    forgotPasswordExpires: {
+      type: Date,
+      select: false,
+    },
     emailVerified: {
       type: Boolean,
       default: false,
@@ -145,6 +155,11 @@ const userSchema = new mongoose.Schema<IUser>(
   },
   { timestamps: true }
 );
+
+// Indexes — email unique index is already created by `unique: true` on the field
+// Only add compound/non-unique indexes here
+userSchema.index({ status: 1, role: 1 });
+userSchema.index({ role: 1 });
 
 // Hash password before saving
 userSchema.pre("save", async function () {

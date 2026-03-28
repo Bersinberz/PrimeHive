@@ -106,7 +106,7 @@ export const updateSettings = async (req: Request, res: Response) => {
         const settings = await Settings.findOneAndUpdate(
             {},
             { $set: updateData },
-            { new: true, upsert: true, runValidators: true }
+            { returnDocument: 'after', upsert: true, runValidators: true }
         );
 
         res.status(200).json(settings);
@@ -231,7 +231,7 @@ export const updateProfile = async (req: Request, res: Response) => {
             updateData.profilePicture = req.file.path;
         }
 
-        const updated = await User.findByIdAndUpdate(userId, updateData, { new: true, runValidators: true }).select("-password -__v");
+        const updated = await User.findByIdAndUpdate(userId, updateData, { returnDocument: 'after', runValidators: true }).select("-password -__v");
         if (!updated) return res.status(404).json({ message: "User not found." });
 
         res.status(200).json(updated);
@@ -255,7 +255,7 @@ export const updateNotificationPreferences = async (req: Request, res: Response)
         const updated = await User.findByIdAndUpdate(
             req.user!.id,
             { $set: update },
-            { new: true }
+            { returnDocument: 'after' }
         ).select("notificationPreferences");
 
         if (!updated) return res.status(404).json({ message: "User not found." });
@@ -329,3 +329,4 @@ export const revokeAllSessions = async (req: Request, res: Response) => {
         res.status(500).json({ message: process.env.NODE_ENV === "production" ? "Internal Server Error" : error.message });
     }
 };
+

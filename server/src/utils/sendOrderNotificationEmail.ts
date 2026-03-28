@@ -1,6 +1,6 @@
 import getTransporter from "../config/mailer";
 import logger from "../config/logger";
-import Settings from "../models/Settings";
+import { getBrand, buildEmail, fmtINR } from "./emailBase";
 import User from "../models/User";
 import mongoose from "mongoose";
 
@@ -20,18 +20,9 @@ interface OrderNotificationPayload {
 
 export const sendOrderNotificationEmail = async (payload: OrderNotificationPayload): Promise<void> => {
   const { orderId, totalAmount, customerName, items } = payload;
+  const brand = await getBrand();
 
-  let storeName = "PrimeHive";
-  let fromEmail = process.env.SMTP_USER || "noreply@primehive.com";
-  const logoUrl = "https://res.cloudinary.com/dhkgj2u8s/image/upload/v1774112861/logo_gq8unu.png";
-
-  try {
-    const settings = await Settings.findOne().select("storeName supportEmail").lean();
-    if (settings?.storeName) storeName = settings.storeName;
-    if (settings?.supportEmail) fromEmail = settings.supportEmail;
-  } catch { /* non-blocking */ }
-
-  // Group items by createdBy staff
+  // Group items by staff
   const staffItemMap = new Map<string, OrderItem[]>();
   for (const item of items) {
     if (!item.createdBy) continue;
@@ -42,93 +33,92 @@ export const sendOrderNotificationEmail = async (payload: OrderNotificationPaylo
 
   if (staffItemMap.size === 0) return;
 
-  // Fetch all relevant staff who have orderPlaced notification enabled
   const staffIds = [...staffItemMap.keys()].map(id => new mongoose.Types.ObjectId(id));
   const staffList = await User.find({
     _id: { $in: staffIds },
     role: "staff",
     status: "active",
     "notificationPreferences.orderPlaced": true,
-  }).select("_id name email notificationPreferences").lean();
+  }).select("_id name email").lean();
 
   for (const staff of staffList) {
     const staffItems = staffItemMap.get(staff._id.toString()) ?? [];
     if (staffItems.length === 0) continue;
 
+    const staffTotal = staffItems.reduce((s, i) => s + i.price * i.quantity, 0);
+
     const itemRows = staffItems.map(item => `
       <tr>
-        <td style="padding:10px 0;border-bottom:1px solid #f0f0f2;">
-          <span style="font-size:14px;font-weight:600;color:#1a1a1a;">${item.name}</span>
-          <span style="font-size:12px;color:#aaa;margin-left:8px;">×${item.quantity}</span>
+        <td style="padding:12px 0;border-bottom:1px solid #f0f0f2;vertical-align:middle;">
+          <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+            ${item.image ? `
+            <td style="padding-right:12px;vertical-align:middle;">
+              <img src="${item.image}" width="48" height="48" alt="${item.name}"
+                style="border-radius:8px;object-fit:cover;display:block;border:1px solid #e9ecef;"/>
+            </td>` : ""}
+            <td style="vertical-align:middle;">
+              <p style="margin:0 0 2px;font-size:14px;font-weight:700;color:#1a1a1a;">${item.name}</p>
+              <p style="margin:0;font-size:12px;color:#adb5bd;">Qty: ${item.quantity}</p>
+            </td>
+          </tr></table>
         </td>
-        <td style="padding:10px 0;border-bottom:1px solid #f0f0f2;text-align:right;font-size:14px;font-weight:700;color:#1a1a1a;">
-          ₹${(item.price * item.quantity).toLocaleString("en-IN")}
+        <td style="padding:12px 0;border-bottom:1px solid #f0f0f2;text-align:right;vertical-align:middle;white-space:nowrap;">
+          <span style="font-size:14px;font-weight:800;color:#1a1a1a;">${fmtINR(item.price * item.quantity)}</span>
         </td>
       </tr>`).join("");
 
-    const html = `
-<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/></head>
-<body style="margin:0;padding:0;background:#f4f4f7;font-family:'Segoe UI',Arial,sans-serif;">
-  <span style="display:none;max-height:0;overflow:hidden;">New order ${orderId} — a customer just bought your product(s).</span>
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:40px 0;">
-    <tr><td align="center">
-      <table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.07);">
-        <tr>
-          <td style="background:linear-gradient(135deg,#ff6b35,#ff8c42);padding:28px 40px;text-align:center;">
-            <img src="${logoUrl}" alt="${storeName} Logo" width="44" height="44" style="border-radius:12px;display:block;margin:0 auto 10px;"/>
-            <h1 style="margin:0;color:#fff;font-size:20px;font-weight:800;">${storeName}</h1>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:36px 40px 28px;">
-            <p style="margin:0 0 6px;font-size:20px;font-weight:800;color:#1a1a1a;">🛍️ New Order Received!</p>
-            <p style="margin:0 0 24px;font-size:14px;color:#666;line-height:1.6;">
-              Hey ${staff.name}, a customer just placed an order containing your product(s).
+    const content = `
+      <tr>
+        <td style="padding:40px 40px 32px;">
+
+          <!-- Alert banner -->
+          <div style="background:#f0fdf4;border-bottom:1px solid #bbf7d0;padding:18px 22px;border-radius:12px;margin-bottom:28px;text-align:center;">
+            <p style="margin:0 0 4px;font-size:18px;font-weight:800;color:#15803d;">🛍️ New Order Received!</p>
+            <p style="margin:0;font-size:13px;color:#166534;">
+              Hey ${staff.name}, a customer just purchased your product(s).
             </p>
+          </div>
 
-            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9ff;border:1px solid #e8eaff;border-radius:12px;margin-bottom:24px;">
-              <tr><td style="padding:16px 20px;">
-                <p style="margin:0 0 4px;font-size:11px;color:#999;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;">Order ID</p>
-                <p style="margin:0;font-size:16px;font-weight:900;color:#6366f1;">${orderId}</p>
-              </td></tr>
-            </table>
+          <!-- Order ID -->
+          <div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:12px;padding:16px 20px;margin-bottom:24px;">
+            <p style="margin:0 0 4px;font-size:10px;font-weight:800;color:#a78bfa;text-transform:uppercase;letter-spacing:1.2px;">Order ID</p>
+            <p style="margin:0;font-size:18px;font-weight:900;color:#6d28d9;">${orderId}</p>
+          </div>
 
-            <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
-              <tr>
-                <th style="text-align:left;font-size:11px;font-weight:800;color:#bbb;text-transform:uppercase;letter-spacing:0.8px;padding-bottom:8px;">Your Items</th>
-                <th style="text-align:right;font-size:11px;font-weight:800;color:#bbb;text-transform:uppercase;letter-spacing:0.8px;padding-bottom:8px;">Amount</th>
-              </tr>
-              ${itemRows}
-            </table>
+          <!-- Items -->
+          <p style="margin:0 0 12px;font-size:10px;font-weight:800;color:#adb5bd;text-transform:uppercase;letter-spacing:1.2px;">Your Items in This Order</p>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">
+            <tr>
+              <th style="text-align:left;font-size:11px;font-weight:700;color:#adb5bd;padding-bottom:8px;">Product</th>
+              <th style="text-align:right;font-size:11px;font-weight:700;color:#adb5bd;padding-bottom:8px;">Amount</th>
+            </tr>
+            ${itemRows}
+            <tr>
+              <td style="padding-top:12px;font-size:14px;font-weight:800;color:#1a1a1a;">Your Total</td>
+              <td style="padding-top:12px;text-align:right;font-size:16px;font-weight:900;color:#ff6b35;">${fmtINR(staffTotal)}</td>
+            </tr>
+          </table>
 
-            <table width="100%" cellpadding="0" cellspacing="0" style="background:#fafafa;border:1px solid #f0f0f2;border-radius:12px;margin-bottom:24px;">
-              <tr><td style="padding:16px 20px;">
-                <div style="display:flex;justify-content:space-between;">
-                  <span style="font-size:13px;color:#666;font-weight:600;">Ordered by</span>
-                  <span style="font-size:13px;color:#1a1a1a;font-weight:700;">${customerName}</span>
-                </div>
-              </td></tr>
-            </table>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:16px 40px 28px;border-top:1px solid #f0f0f2;text-align:center;">
-            <p style="margin:0;font-size:12px;color:#bbb;">You're receiving this because you have order notifications enabled in your account settings.</p>
-          </td>
-        </tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
+          <!-- Customer info -->
+          <div style="background:#f8f9fa;border:1px solid #e9ecef;border-radius:12px;padding:16px 20px;">
+            <p style="margin:0 0 4px;font-size:10px;font-weight:800;color:#adb5bd;text-transform:uppercase;letter-spacing:1.2px;">Ordered By</p>
+            <p style="margin:0;font-size:14px;font-weight:700;color:#1a1a1a;">${customerName}</p>
+          </div>
+
+        </td>
+      </tr>`;
+
+    const html = buildEmail(
+      brand,
+      `New order ${orderId} — ${customerName} just bought your product(s).`,
+      content
+    );
 
     try {
       await getTransporter().sendMail({
-        from: `"${storeName}" <${fromEmail}>`,
+        from: `"${brand.storeName}" <${brand.fromEmail}>`,
         to: staff.email,
-        subject: `New Order ${orderId} — ${storeName}`,
+        subject: `New Order ${orderId} — ${brand.storeName}`,
         html,
       });
       logger.info(`Order notification sent to staff ${staff.email} for order ${orderId}`);

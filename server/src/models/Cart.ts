@@ -35,4 +35,6 @@ const CartSchema = new Schema<ICart>(
   { timestamps: true }
 );
 
+// user unique index is already created by `unique: true` on the field
+
 export default mongoose.model<ICart>("Cart", CartSchema);

@@ -1,6 +1,6 @@
 import getTransporter from "../config/mailer";
 import logger from "../config/logger";
-import Settings from "../models/Settings";
+import { getBrand, buildEmail } from "./emailBase";
 
 interface VerificationEmailPayload {
   name: string;
@@ -12,92 +12,67 @@ export const sendVerificationEmail = async (payload: VerificationEmailPayload): 
   const { name, email, token } = payload;
   const clientUrl = process.env.CLIENT_URL || "";
   const verifyUrl = `${clientUrl}/verify-email?token=${token}`;
-  const logoUrl = "https://res.cloudinary.com/dhkgj2u8s/image/upload/v1774112861/logo_gq8unu.png";
+  const brand = await getBrand();
 
-  let storeName = "PrimeHive";
-  let fromEmail = process.env.SMTP_USER || "noreply@primehive.com";
-  try {
-    const settings = await Settings.findOne().select("storeName supportEmail").lean();
-    if (settings?.storeName) storeName = settings.storeName;
-    if (settings?.supportEmail) fromEmail = settings.supportEmail;
-  } catch {
-    // non-blocking
-  }
-
-  const html = `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Verify your email — ${storeName}</title>
-</head>
-<body style="margin:0;padding:0;background:#f4f4f7;font-family:'Segoe UI',Arial,sans-serif;">
-  <span style="display:none;max-height:0;overflow:hidden;">Verify your email address to secure your ${storeName} account.</span>
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:40px 0;">
+  const content = `
     <tr>
-      <td align="center">
-        <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.07);">
+      <td style="padding:40px 40px 32px;">
+        <h2 style="margin:0 0 8px;font-size:24px;font-weight:800;color:#1a1a1a;letter-spacing:-0.3px;">Verify your email address</h2>
+        <p style="margin:0 0 28px;font-size:15px;color:#6c757d;line-height:1.7;">
+          Hi <strong style="color:#1a1a1a;">${name}</strong>, thanks for signing up.
+          Please confirm your email address to activate your account and start shopping.
+        </p>
 
-          <!-- Header -->
+        <!-- CTA Button -->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:32px;">
           <tr>
-            <td style="background:linear-gradient(135deg,#ff6b35,#ff8c42);padding:32px 40px;text-align:center;">
-              <img src="${logoUrl}" alt="${storeName}" width="52" height="52" style="border-radius:14px;display:block;margin:0 auto 12px;" />
-              <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:800;letter-spacing:-0.3px;">${storeName}</h1>
+            <td align="center">
+              <a href="${verifyUrl}"
+                style="display:inline-block;background:linear-gradient(135deg,#ff6b35,#ff8c42);color:#ffffff;text-decoration:none;font-size:16px;font-weight:700;padding:16px 48px;border-radius:50px;letter-spacing:0.3px;box-shadow:0 4px 16px rgba(255,107,53,0.35);">
+                Verify Email Address
+              </a>
             </td>
           </tr>
-
-          <!-- Body -->
-          <tr>
-            <td style="padding:40px 40px 32px;">
-              <p style="margin:0 0 8px;font-size:22px;font-weight:800;color:#1a1a1a;">Verify your email</p>
-              <p style="margin:0 0 28px;font-size:15px;color:#666;line-height:1.6;">
-                Hi <strong>${name}</strong>, click the button below to verify your email address. This link expires in <strong>24 hours</strong>.
-              </p>
-
-              <!-- CTA -->
-              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
-                <tr>
-                  <td align="center">
-                    <a href="${verifyUrl}" style="display:inline-block;background:linear-gradient(135deg,#ff6b35,#ff8c42);color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;padding:16px 44px;border-radius:50px;letter-spacing:0.3px;">
-                      Verify Email Address
-                    </a>
-                  </td>
-                </tr>
-              </table>
-
-              <p style="margin:24px 0 0;font-size:13px;color:#aaa;line-height:1.6;">
-                If you didn't request this, you can safely ignore this email. Your account remains secure.
-              </p>
-            </td>
-          </tr>
-
-          <!-- Footer -->
-          <tr>
-            <td style="padding:20px 40px 32px;border-top:1px solid #f0f0f2;text-align:center;">
-              <p style="margin:0;font-size:12px;color:#bbb;">
-                © ${new Date().getFullYear()} ${storeName}. All rights reserved.
-              </p>
-            </td>
-          </tr>
-
         </table>
+
+        <!-- Expiry notice -->
+        <div style="background:#fff8f0;border:1px solid #ffe4cc;border-radius:12px;padding:16px 20px;margin-bottom:24px;">
+          <p style="margin:0;font-size:13px;color:#c05621;line-height:1.6;">
+            <strong>⏱ This link expires in 24 hours.</strong>
+            If it expires, you can request a new verification email from your account settings.
+          </p>
+        </div>
+
+        <!-- Fallback link -->
+        <p style="margin:0 0 6px;font-size:12px;color:#adb5bd;">If the button doesn't work, copy and paste this link into your browser:</p>
+        <p style="margin:0;font-size:11px;word-break:break-all;">
+          <a href="${verifyUrl}" style="color:#ff6b35;text-decoration:none;">${verifyUrl}</a>
+        </p>
+
+        <hr style="border:none;border-top:1px solid #f0f0f2;margin:28px 0;"/>
+        <p style="margin:0;font-size:13px;color:#adb5bd;line-height:1.6;">
+          If you didn't create an account with ${brand.storeName}, you can safely ignore this email.
+          Your email address will not be used without verification.
+        </p>
       </td>
-    </tr>
-  </table>
-</body>
-</html>`;
+    </tr>`;
+
+  const html = buildEmail(
+    brand,
+    `Verify your email to activate your ${brand.storeName} account.`,
+    content
+  );
 
   try {
     await getTransporter().sendMail({
-      from: `"${storeName}" <${fromEmail}>`,
+      from: `"${brand.storeName}" <${brand.fromEmail}>`,
       to: email,
-      subject: `Verify your email — ${storeName}`,
+      subject: `Verify your email — ${brand.storeName}`,
       html,
     });
     logger.info(`Verification email sent to ${email}`);
   } catch (err) {
     logger.error(`Failed to send verification email to ${email}:`, err);
-    throw err; // re-throw so the controller can return a 500
+    throw err;
   }
 };

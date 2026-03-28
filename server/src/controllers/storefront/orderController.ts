@@ -193,8 +193,8 @@ export const createOrder = async (req: Request, res: Response) => {
 
     sendOrderNotificationEmail({ orderId, totalAmount, customerName, items: enrichedItems });
 
-    // Send customer confirmation email
-    if (customerEmail) {
+    // Send customer confirmation email — only for COD (Razorpay sends it after payment verification)
+    if (customerEmail && paymentMethod !== "Razorpay") {
       sendCustomerOrderEmail({
         to: customerEmail,
         customerName,
@@ -308,37 +308,30 @@ export const requestRefund = async (req: Request, res: Response) => {
     if (!order) return res.status(404).json({ message: "Order not found" });
 
     if (order.status !== "Delivered") {
-      return res.status(400).json({
-        message: "Refund can only be requested for delivered orders.",
-      });
+      return res.status(400).json({ message: "Refund can only be requested for delivered orders." });
     }
 
-    order.status = "Refunded";
-    order.timeline.push({ status: "Refunded", timestamp: new Date(), note: req.body.reason || "Refund requested by customer" });
+    if (order.refundStatus === "pending_refund") {
+      return res.status(400).json({ message: "A refund request is already pending for this order." });
+    }
+
+    if (order.refundStatus === "refunded") {
+      return res.status(400).json({ message: "This order has already been refunded." });
+    }
+
+    const { reason } = req.body;
+    if (!reason?.trim()) {
+      return res.status(400).json({ message: "Please provide a reason for the refund request." });
+    }
+
+    order.refundStatus = "pending_refund";
+    order.refundReason = reason.trim();
+    order.timeline.push({ status: order.status, timestamp: new Date(), note: `Refund requested: ${reason.trim()}` });
     await order.save();
 
-    // Notify customer
-    const userRecord = await import("../../models/User").then(m =>
-      m.default.findById(req.user!.id).select("name email").lean()
-    );
-    const customerEmail = (userRecord as any)?.email;
-    const customerName = (userRecord as any)?.name || "Customer";
-    if (customerEmail) {
-      const { sendOrderStatusEmail } = await import("../../utils/sendOrderStatusEmail");
-      sendOrderStatusEmail({
-        to: customerEmail,
-        customerName,
-        orderId: order.orderId,
-        newStatus: "Refunded",
-        note: req.body.reason || "Refund requested by customer",
-      }).catch(() => {});
-    }
-
-    res.status(200).json({ message: "Refund request submitted successfully", status: "Refunded" });
+    res.status(200).json({ message: "Refund request submitted. Our team will review it shortly.", refundStatus: "pending_refund" });
   } catch (error: any) {
-    res.status(500).json({
-      message: process.env.NODE_ENV === "production" ? "Internal Server Error" : error.message,
-    });
+    res.status(500).json({ message: process.env.NODE_ENV === "production" ? "Internal Server Error" : error.message });
   }
 };
 

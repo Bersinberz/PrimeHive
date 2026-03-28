@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "../../context/ToastContext";
 import PrimeLoader from "../../components/PrimeLoader";
 import ActionConfirmModal from "../../components/Admin/ActionConfirmModal";
+import ToggleSwitch from "../../components/Admin/ToggleSwitch";
 import { getOffers, createOffer, updateOffer, deleteOffer } from "../../services/admin/offerService";
 import type { Offer, OfferPayload } from "../../services/admin/offerService";
 import { getCoupons, createCoupon, updateCoupon, deleteCoupon } from "../../services/admin/couponService";
@@ -155,11 +156,7 @@ const OfferForm: React.FC<OfferFormProps> = ({ initial, products, saving, onSave
           </div>
         </div>
 
-        <div className="form-check form-switch m-0">
-          <input className="form-check-input" type="checkbox" role="switch" id="offerActive"
-            checked={form.isActive} onChange={e => set("isActive", e.target.checked)} />
-          <label className="form-check-label fw-bold" htmlFor="offerActive" style={{ fontSize: "0.85rem" }}>Active</label>
-        </div>
+        <ToggleSwitch id="offerActive" checked={form.isActive} onChange={v => set("isActive", v)} label="Active" />
 
         <div>
           <label style={labelStyle}>Assign Products ({form.productIds?.length ?? 0} selected)</label>
@@ -288,11 +285,7 @@ const CouponForm: React.FC<CouponFormProps> = ({ initial, saving, onSave, onCanc
             onChange={e => set("expiryDate", e.target.value || undefined)} />
         </div>
 
-        <div className="form-check form-switch m-0">
-          <input className="form-check-input" type="checkbox" role="switch" id="couponActive"
-            checked={form.isActive} onChange={e => set("isActive", e.target.checked)} />
-          <label className="form-check-label fw-bold" htmlFor="couponActive" style={{ fontSize: "0.85rem" }}>Active</label>
-        </div>
+        <ToggleSwitch id="couponActive" checked={form.isActive} onChange={v => set("isActive", v)} label="Active" />
 
         {err && <div className="text-danger fw-semibold" style={{ fontSize: "0.82rem" }}>{err}</div>}
 
@@ -348,8 +341,11 @@ const OffersManagement: React.FC = () => {
     catch { /* silent */ }
   }, []);
 
-  useEffect(() => { loadOffers(); loadProducts(); }, [loadOffers, loadProducts]);
-  useEffect(() => { if (tab === "coupons") loadCoupons(); }, [tab, loadCoupons]);
+  useEffect(() => { loadProducts(); }, [loadProducts]);
+  useEffect(() => {
+    if (tab === "offers") loadOffers();
+    else loadCoupons();
+  }, [tab, loadOffers, loadCoupons]);
 
   const handleSaveOffer = async (data: OfferPayload, id?: string) => {
     setSaving(true);

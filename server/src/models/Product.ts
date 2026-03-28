@@ -98,5 +98,8 @@ ProductSchema.index(
   { name: "text", category: "text", description: "text" },
   { weights: { name: 10, category: 5, description: 3 }, name: "product_text_search" }
 );
+ProductSchema.index({ status: 1, category: 1 });
+ProductSchema.index({ stock: 1 });
+ProductSchema.index({ createdBy: 1 });
 
 export default mongoose.model<IProduct>("Product", ProductSchema);

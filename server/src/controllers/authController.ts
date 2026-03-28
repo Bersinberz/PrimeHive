@@ -15,6 +15,7 @@ import { redisGet, redisSet, redisDel } from "../config/redis";
 import { sendStaffWelcomeEmail } from "../utils/sendStaffWelcomeEmail";
 import { sendCustomerWelcomeEmail } from "../utils/sendCustomerWelcomeEmail";
 import { sendPasswordChangedEmail } from "../utils/sendPasswordChangedEmail";
+import { sendForgotPasswordEmail } from "../utils/sendForgotPasswordEmail";
 
 // ==========================================
 // Cookie Config
@@ -419,6 +420,93 @@ export const resendSetupEmail = async (req: Request, res: Response) => {
     sendStaffWelcomeEmail({ name: user.name, email: user.email, rawToken });
 
     return res.status(200).json({ message: "If this account exists and hasn't set a password, a new link has been sent." });
+  } catch (error) {
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+// ==========================================
+// Forgot Password
+// ==========================================
+
+export const forgotPassword = async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+
+    // Always return 200 to prevent email enumeration
+    const genericResponse = {
+      message: "If an account with that email exists, a password reset link has been sent.",
+    };
+
+    if (!email || !isValidEmail(email.trim().toLowerCase())) {
+      return res.status(200).json(genericResponse);
+    }
+
+    const user = await User.findOne({
+      email: email.trim().toLowerCase(),
+      status: { $ne: "deleted" },
+      isPasswordSet: true, // staff who haven't set password yet use set-password flow
+    }).select("+forgotPasswordToken +forgotPasswordExpires");
+
+    if (!user) return res.status(200).json(genericResponse);
+
+    // Generate token
+    const rawToken = crypto.randomBytes(32).toString("hex");
+    const hashedToken = crypto.createHash("sha256").update(rawToken).digest("hex");
+
+    user.forgotPasswordToken = hashedToken;
+    user.forgotPasswordExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    await user.save();
+
+    // Fire-and-forget
+    sendForgotPasswordEmail({ name: user.name, email: user.email, rawToken }).catch(() => {});
+
+    return res.status(200).json(genericResponse);
+  } catch (error) {
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+// ==========================================
+// Reset Password
+// ==========================================
+
+export const resetPassword = async (req: Request, res: Response) => {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return res.status(400).json({ message: "Token and new password are required." });
+    }
+
+    const passwordError = validatePassword(newPassword);
+    if (passwordError) return res.status(400).json({ message: passwordError });
+
+    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+
+    const user = await User.findOne({
+      forgotPasswordToken: hashedToken,
+      forgotPasswordExpires: { $gt: new Date() },
+    }).select("+password +forgotPasswordToken +forgotPasswordExpires");
+
+    if (!user) {
+      return res.status(400).json({
+        message: "This reset link is invalid or has expired. Please request a new one.",
+      });
+    }
+
+    user.password = newPassword; // pre-save hook hashes it
+    user.forgotPasswordToken = undefined;
+    user.forgotPasswordExpires = undefined;
+    await user.save();
+
+    // Revoke all active sessions for security
+    await revokeRefreshToken(user._id.toString());
+
+    // Fire-and-forget security notification
+    sendPasswordChangedEmail({ name: user.name, email: user.email }).catch(() => {});
+
+    return res.status(200).json({ message: "Password reset successfully. You can now sign in." });
   } catch (error) {
     return res.status(500).json({ message: "Internal Server Error" });
   }

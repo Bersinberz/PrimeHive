@@ -102,3 +102,35 @@ export const updateProduct = async (id: string, payload: CreateProductPayload): 
 export const deleteProduct = async (id: string): Promise<void> => {
   await axiosInstance.delete(`admin/products/delete/${id}`);
 };
+
+// Export products as CSV (returns blob URL)
+export const exportProductsCSV = async (): Promise<void> => {
+  const response = await axiosInstance.get("admin/products/export", { responseType: "blob" });
+  const url = window.URL.createObjectURL(new Blob([response.data]));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `products-${Date.now()}.csv`;
+  a.click();
+  window.URL.revokeObjectURL(url);
+};
+
+export interface ImportRow {
+  name: string;
+  price: number;
+  category: string;
+  description?: string;
+  comparePrice?: number;
+  sku?: string;
+  stock?: number;
+  status?: "active" | "draft" | "archived";
+}
+
+export interface ImportResult {
+  message: string;
+  results: { row: number; success: boolean; error?: string; product?: Product }[];
+}
+
+export const importProductsCSV = async (rows: ImportRow[]): Promise<ImportResult> => {
+  const { data } = await axiosInstance.post("admin/products/import", { rows });
+  return data;
+};

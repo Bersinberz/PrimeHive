@@ -131,7 +131,7 @@ export const updateStaffStatus = async (req: Request, res: Response) => {
         const staff = await User.findOneAndUpdate(
             { _id: req.params.id, role: "staff" },
             { status },
-            { new: true, runValidators: true }
+            { returnDocument: 'after', runValidators: true }
         ).select("-__v");
 
         if (!staff) return res.status(404).json({ message: "Staff member not found." });
@@ -201,7 +201,7 @@ export const updateStaff = async (req: Request, res: Response) => {
         const staff = await User.findOneAndUpdate(
             { _id: req.params.id, role: "staff" },
             updateData,
-            { new: true, runValidators: true }
+            { returnDocument: 'after', runValidators: true }
         ).select("-__v");
 
         if (req.file && oldProfilePicture) {
@@ -227,7 +227,7 @@ export const deleteStaff = async (req: Request, res: Response) => {
         const staff = await User.findOneAndUpdate(
             { _id: req.params.id, role: "staff" },
             { status: "deleted", deletedAt: new Date() },
-            { new: true }
+            { returnDocument: 'after' }
         );
 
         if (!staff) return res.status(404).json({ message: "Staff member not found." });
@@ -296,7 +296,7 @@ export const revokeStaffDeletion = async (req: Request, res: Response) => {
         const staff = await User.findOneAndUpdate(
             { _id: req.params.id, role: "staff", status: "deleted" },
             { status: "active", deletedAt: null },
-            { new: true }
+            { returnDocument: 'after' }
         ).select("-__v");
 
         if (!staff) return res.status(404).json({ message: "Staff member not found or not in deleted state." });
@@ -368,3 +368,4 @@ export const getStaffStoreStats = async (req: Request, res: Response) => {
         });
     }
 };
+

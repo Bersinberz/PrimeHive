@@ -21,4 +21,7 @@ export interface ActiveOfferBanner {
 }
 
 export const getActiveOffers = (): Promise<ActiveOfferBanner[]> =>
-  axiosInstance.get("/offers/active").then(r => r.data);
+  axiosInstance.get("/offers/active").then(r => {
+    const data = r.data;
+    return Array.isArray(data) ? data : [];
+  });

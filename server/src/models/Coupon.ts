@@ -29,7 +29,7 @@ const CouponSchema = new Schema<ICoupon>(
   { timestamps: true }
 );
 
-CouponSchema.index({ code: 1 }, { unique: true });
+// code unique index is already created by `unique: true` on the field
 CouponSchema.index({ isActive: 1 });
 
 export default mongoose.model<ICoupon>("Coupon", CouponSchema);

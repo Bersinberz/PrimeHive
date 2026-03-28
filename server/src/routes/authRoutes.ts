@@ -7,6 +7,8 @@ import {
     logout,
     setPassword,
     resendSetupEmail,
+    forgotPassword,
+    resetPassword,
 } from "../controllers/authController";
 import {
     getProfile,
@@ -23,6 +25,8 @@ import {
 import { verifyToken } from "../middleware/verifyToken";
 import { userOnly } from "../middleware/userOnly";
 import { uploadProfile } from "../middleware/upload";
+import { validate } from "../middleware/validate";
+import { LoginSchema, SignupSchema, ForgotPasswordSchema, ResetPasswordSchema, SetPasswordSchema } from "../schemas/authSchemas";
 
 const router = express.Router();
 
@@ -38,12 +42,20 @@ const setupLimiter = rateLimit({
     message: { message: "Too many attempts. Please try again later." }
 });
 
-router.post("/signup", signup);
-router.post("/login", loginLimiter, login);
-router.post("/refresh", refreshSession);
-router.post("/logout", logout);
-router.post("/set-password", setupLimiter, setPassword);
+const forgotPasswordLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 3,
+    message: { message: "Too many password reset requests. Please try again in 15 minutes." }
+});
+
+router.post("/signup",             validate(SignupSchema),          signup);
+router.post("/login",              loginLimiter, validate(LoginSchema), login);
+router.post("/refresh",            refreshSession);
+router.post("/logout",             logout);
+router.post("/set-password",       setupLimiter, validate(SetPasswordSchema),      setPassword);
 router.post("/resend-setup-email", setupLimiter, resendSetupEmail);
+router.post("/forgot-password",    forgotPasswordLimiter, validate(ForgotPasswordSchema), forgotPassword);
+router.post("/reset-password",     setupLimiter, validate(ResetPasswordSchema),    resetPassword);
 
 // Customer self-service profile (user role only)
 router.get("/profile", verifyToken, userOnly, getProfile);
