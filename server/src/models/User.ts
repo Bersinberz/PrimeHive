@@ -1,6 +1,24 @@
 import mongoose, { Document } from "mongoose";
 import bcrypt from "bcryptjs";
 
+export interface IAdminStaffPermissions {
+  staff:     { view: boolean };
+  orders:    { view: boolean; updateStatus: boolean };
+  customers: { view: boolean; edit: boolean };
+  offers:    { view: boolean; create: boolean; edit: boolean; delete: boolean };
+  reviews:   { view: boolean; moderate: boolean; delete: boolean };
+  returns:   { view: boolean; process: boolean };
+}
+
+export const DEFAULT_ADMIN_STAFF_PERMISSIONS: IAdminStaffPermissions = {
+  staff:     { view: false },
+  orders:    { view: true, updateStatus: false },
+  customers: { view: true, edit: false },
+  offers:    { view: true, create: false, edit: false, delete: false },
+  reviews:   { view: true, moderate: false, delete: false },
+  returns:   { view: true, process: false },
+};
+
 export interface IPermissions {
   dashboard:  { view: boolean };
   products:   { view: boolean; create: boolean; edit: boolean; delete: boolean };
@@ -26,7 +44,7 @@ export interface IUser extends Document {
   email: string;
   phone: string;
   password: string;
-  role: "superadmin" | "staff" | "user";
+  role: "superadmin" | "staff" | "admin_staff" | "delivery_partner" | "user";
   status: "active" | "inactive" | "deleted";
   gender?: "Male" | "Female" | "Other" | "Prefer not to say";
   profilePicture?: string;
@@ -34,6 +52,7 @@ export interface IUser extends Document {
   deletedAt?: Date;
   dateOfBirth?: Date;
   permissions?: IPermissions;
+  adminStaffPermissions?: IAdminStaffPermissions;
   isPasswordSet: boolean;
   passwordSetToken?: string;
   passwordSetExpires?: Date;
@@ -47,6 +66,9 @@ export interface IUser extends Document {
   storeDescription?: string;
   storeLocation?: string;
   storePhone?: string;
+  // Delivery partner profile
+  vehicleType?: string;
+  vehicleNumber?: string;
   // Notification preferences
   notificationPreferences?: {
     orderPlaced: boolean;
@@ -83,7 +105,7 @@ const userSchema = new mongoose.Schema<IUser>(
     },
     role: {
       type: String,
-      enum: ["superadmin", "staff", "user"],
+      enum: ["superadmin", "staff", "admin_staff", "delivery_partner", "user"],
       default: "user"
     },
     status: {
@@ -107,6 +129,10 @@ const userSchema = new mongoose.Schema<IUser>(
       type: Date
     },
     permissions: {
+      type: mongoose.Schema.Types.Mixed,
+      default: undefined,
+    },
+    adminStaffPermissions: {
       type: mongoose.Schema.Types.Mixed,
       default: undefined,
     },
@@ -147,6 +173,9 @@ const userSchema = new mongoose.Schema<IUser>(
     storeDescription: { type: String, trim: true, maxlength: 500 },
     storeLocation:    { type: String, trim: true, maxlength: 200 },
     storePhone:       { type: String, trim: true, maxlength: 20 },
+    // Delivery partner profile
+    vehicleType:   { type: String, trim: true, maxlength: 50 },
+    vehicleNumber: { type: String, trim: true, maxlength: 20 },
     // Notification preferences (staff)
     notificationPreferences: {
       orderPlaced: { type: Boolean, default: true },

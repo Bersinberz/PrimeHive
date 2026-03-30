@@ -56,6 +56,14 @@ const ReturnManagement   = lazy(() => import("./pages/Admin/ReturnManagement"));
 const AuditLogPage       = lazy(() => import("./pages/Admin/AuditLog"));
 const AdvancedAnalytics  = lazy(() => import("./pages/Admin/AdvancedAnalytics"));
 const BulkProducts       = lazy(() => import("./pages/Admin/BulkProducts"));
+const AdminStaffMgmt     = lazy(() => import("./pages/Admin/AdminStaffManagement"));
+const DeliveryPartnerMgmt = lazy(() => import("./pages/Admin/DeliveryPartnerManagement"));
+
+// ── Delivery Panel ────────────────────────────────────────────
+const DeliveryLayout     = lazy(() => import("./components/Delivery/DeliveryLayout"));
+const DeliveryDashboard  = lazy(() => import("./pages/Delivery/DeliveryDashboard"));
+const DeliveryOrders     = lazy(() => import("./pages/Delivery/DeliveryOrders"));
+const DeliveryOrderDetail = lazy(() => import("./pages/Delivery/DeliveryOrderDetail"));
 
 const PageLoader = () => (
   <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -110,18 +118,28 @@ function App() {
                       <Route path="products"        element={<ProtectedRoute permission="products">   <ProductManagement />   </ProtectedRoute>} />
                       <Route path="categories"      element={<ProtectedRoute permission="categories"> <CategoryManagement />  </ProtectedRoute>} />
                       <Route path="orders"          element={<ProtectedRoute permission="orders">     <OrderManagement />     </ProtectedRoute>} />
-                      <Route path="customers"       element={<ProtectedRoute allowedRoles={["superadmin"]}><CustomerManagement /></ProtectedRoute>} />
-                      <Route path="staff"           element={<ProtectedRoute allowedRoles={["superadmin"]}><StaffManagement /></ProtectedRoute>} />
+                      <Route path="customers"       element={<ProtectedRoute allowedRoles={["superadmin", "admin_staff"]}><CustomerManagement /></ProtectedRoute>} />
+                      <Route path="staff"           element={<ProtectedRoute allowedRoles={["superadmin", "admin_staff"]}><StaffManagement /></ProtectedRoute>} />
                       <Route path="settings"        element={<ProtectedRoute allowedRoles={["superadmin"]}><Settings /></ProtectedRoute>} />
                       <Route path="profile"         element={<ProtectedRoute><MyProfile /></ProtectedRoute>} />
                       <Route path="store-profile"   element={<ProtectedRoute allowedRoles={["staff"]}><StoreProfilePage /></ProtectedRoute>} />
                       <Route path="account-settings" element={<ProtectedRoute allowedRoles={["staff"]}><StaffSettings /></ProtectedRoute>} />
-                      <Route path="offers"          element={<ProtectedRoute allowedRoles={["superadmin"]}><OffersManagement /></ProtectedRoute>} />
-                      <Route path="reviews"         element={<ProtectedRoute allowedRoles={["superadmin"]}><ReviewManagement /></ProtectedRoute>} />
-                      <Route path="returns"         element={<ProtectedRoute permission="orders"><ReturnManagement /></ProtectedRoute>} />
+                      <Route path="offers"          element={<ProtectedRoute allowedRoles={["superadmin", "admin_staff"]}><OffersManagement /></ProtectedRoute>} />
+                      <Route path="reviews"         element={<ProtectedRoute allowedRoles={["superadmin", "admin_staff"]}><ReviewManagement /></ProtectedRoute>} />
+                      <Route path="returns"         element={<ProtectedRoute allowedRoles={["superadmin", "admin_staff"]} permission="orders"><ReturnManagement /></ProtectedRoute>} />
                       <Route path="audit-log"       element={<ProtectedRoute allowedRoles={["superadmin"]}><AuditLogPage /></ProtectedRoute>} />
                       <Route path="analytics"       element={<ProtectedRoute allowedRoles={["superadmin"]}><AdvancedAnalytics /></ProtectedRoute>} />
                       <Route path="bulk-products"   element={<ProtectedRoute permission="products"><BulkProducts /></ProtectedRoute>} />
+                      <Route path="admin-staff"     element={<ProtectedRoute allowedRoles={["superadmin"]}><AdminStaffMgmt /></ProtectedRoute>} />
+                      <Route path="delivery-partners" element={<ProtectedRoute allowedRoles={["superadmin"]}><DeliveryPartnerMgmt /></ProtectedRoute>} />
+                    </Route>
+
+                    {/* Delivery Panel */}
+                    <Route path="/delivery" element={<ProtectedRoute allowedRoles={["delivery_partner"]}><DeliveryLayout /></ProtectedRoute>}>
+                      <Route index element={<Navigate to="dashboard" replace />} />
+                      <Route path="dashboard" element={<DeliveryDashboard />} />
+                      <Route path="orders"    element={<DeliveryOrders />} />
+                      <Route path="orders/:id" element={<DeliveryOrderDetail />} />
                     </Route>
                   </Routes>
                 </Suspense>

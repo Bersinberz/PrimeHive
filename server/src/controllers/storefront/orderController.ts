@@ -9,6 +9,7 @@ import { getNextSequence } from "../../models/Counter";
 import { sendOrderNotificationEmail } from "../../utils/sendOrderNotificationEmail";
 import { sendCustomerOrderEmail } from "../../utils/sendCustomerOrderEmail";
 import { sendLowStockEmail } from "../../utils/sendLowStockEmail";
+import logger from "../../config/logger";
 
 interface OrderItemInput {
   productId: string;
@@ -172,11 +173,11 @@ export const createOrder = async (req: Request, res: Response) => {
 
     await session.commitTransaction();
 
-    // Increment salesCount for each product ordered (fire-and-forget)
+    // Increment salesCount (fire-and-forget with logging)
     const salesIncrements = orderItems.map(item =>
       Product.findByIdAndUpdate(item.product, { $inc: { salesCount: item.quantity } })
     );
-    Promise.all(salesIncrements).catch(() => {});
+    Promise.all(salesIncrements).catch(err => logger.warn("salesCount update failed:", err));
 
     // Fire-and-forget: notify staff whose products were ordered + check low stock
     const userRecord = req.user?.id
@@ -235,6 +236,7 @@ export const createOrder = async (req: Request, res: Response) => {
       paymentMethod: order.paymentMethod,
       shippingAddress: order.shippingAddress,
       items: order.items,
+      timeline: order.timeline,
       createdAt: order.createdAt,
     });
   } catch (error: any) {
@@ -320,13 +322,11 @@ export const requestRefund = async (req: Request, res: Response) => {
     }
 
     const { reason } = req.body;
-    if (!reason?.trim()) {
-      return res.status(400).json({ message: "Please provide a reason for the refund request." });
-    }
+    // reason is optional — admin can see the request without a reason
 
     order.refundStatus = "pending_refund";
-    order.refundReason = reason.trim();
-    order.timeline.push({ status: order.status, timestamp: new Date(), note: `Refund requested: ${reason.trim()}` });
+    if (reason?.trim()) order.refundReason = reason.trim();
+    order.timeline.push({ status: order.status, timestamp: new Date(), note: reason?.trim() ? `Refund requested: ${reason.trim()}` : "Refund requested by customer" });
     await order.save();
 
     res.status(200).json({ message: "Refund request submitted. Our team will review it shortly.", refundStatus: "pending_refund" });
@@ -341,8 +341,8 @@ export const requestRefund = async (req: Request, res: Response) => {
  */
 export const getMyOrders = async (req: Request, res: Response) => {
   try {
-    const page = Math.max(1, parseInt(req.query.page as string) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 10));
+    const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string, 10) || 10));
     const skip = (page - 1) * limit;
 
     const [orders, total] = await Promise.all([
@@ -350,7 +350,7 @@ export const getMyOrders = async (req: Request, res: Response) => {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .select("orderId items totalAmount status createdAt shippingAddress")
+        .select("orderId items totalAmount status paymentMethod refundStatus createdAt shippingAddress")
         .lean(),
       Order.countDocuments({ customer: req.user!.id }),
     ]);

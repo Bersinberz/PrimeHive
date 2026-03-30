@@ -62,11 +62,7 @@ export const sendStaffWelcomeEmail = async (payload: StaffWelcomePayload): Promi
           </p>
         </div>
 
-        <!-- Fallback link -->
-        <p style="margin:0 0 6px;font-size:12px;color:#adb5bd;">If the button doesn't work, copy and paste this link:</p>
-        <p style="margin:0 0 24px;font-size:11px;word-break:break-all;">
-          <a href="${setupLink}" style="color:#ff6b35;text-decoration:none;">${setupLink}</a>
-        </p>
+        <!-- Fallback link removed for security -->
 
         <hr style="border:none;border-top:1px solid #f0f0f2;margin:0 0 24px;"/>
         <p style="margin:0;font-size:13px;color:#adb5bd;line-height:1.6;">

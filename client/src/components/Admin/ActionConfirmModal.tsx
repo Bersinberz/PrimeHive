@@ -2,7 +2,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle, CheckCircle, Lock, Trash2, Unlock } from 'lucide-react';
 
-export type ActionConfirmType = 'activate' | 'deactivate' | 'delete' | 'delete_product' | 'hard_delete';
+export type ActionConfirmType = 'activate' | 'deactivate' | 'delete' | 'delete_product' | 'hard_delete' | 'delete_member' | 'delete_offer' | 'delete_coupon' | 'delete_review' | 'delete_category';
 
 interface ActionConfirmModalProps {
   isOpen: boolean;
@@ -79,6 +79,56 @@ const ActionConfirmModal: React.FC<ActionConfirmModalProps> = ({
             ? <img src={itemImage} alt={itemName} style={{ width: 44, height: 44, borderRadius: 10, objectFit: 'cover' }} />
             : <Trash2 size={22} color="#ef4444" strokeWidth={2.5} />,
           iconBg: itemImage ? 'transparent' : 'rgba(239,68,68,0.1)',
+        };
+      case 'delete_member':
+        return {
+          title: 'Remove member?',
+          body: <><strong style={{ color: '#1a1a1a' }}>{itemName}</strong> will be deactivated and won't be able to log in. You can permanently delete them afterwards.</>,
+          confirmText: 'Remove',
+          confirmColor: '#fff',
+          confirmBg: '#ef4444',
+          icon: <Trash2 size={22} color="#ef4444" strokeWidth={2.5} />,
+          iconBg: 'rgba(239,68,68,0.1)',
+        };
+      case 'delete_offer':
+        return {
+          title: 'Delete offer?',
+          body: <><strong style={{ color: '#1a1a1a' }}>{itemName}</strong> will be removed and products will no longer have this discount applied.</>,
+          confirmText: 'Delete offer',
+          confirmColor: '#fff',
+          confirmBg: '#ef4444',
+          icon: <Trash2 size={22} color="#ef4444" strokeWidth={2.5} />,
+          iconBg: 'rgba(239,68,68,0.1)',
+        };
+      case 'delete_coupon':
+        return {
+          title: 'Delete coupon?',
+          body: <><strong style={{ color: '#1a1a1a' }}>{itemName}</strong> will be permanently removed. Customers won't be able to use this code anymore.</>,
+          confirmText: 'Delete coupon',
+          confirmColor: '#fff',
+          confirmBg: '#ef4444',
+          icon: <Trash2 size={22} color="#ef4444" strokeWidth={2.5} />,
+          iconBg: 'rgba(239,68,68,0.1)',
+        };
+      case 'delete_review':
+        return {
+          title: 'Delete review?',
+          body: <><strong style={{ color: '#1a1a1a' }}>{itemName}</strong> will be permanently removed from the storefront.</>,
+          confirmText: 'Delete review',
+          confirmColor: '#fff',
+          confirmBg: '#ef4444',
+          icon: <Trash2 size={22} color="#ef4444" strokeWidth={2.5} />,
+          iconBg: 'rgba(239,68,68,0.1)',
+        };
+      case 'delete_category':
+        return {
+          title: 'Delete category?',
+          body: <><strong style={{ color: '#1a1a1a' }}>{itemName}</strong> will be permanently removed. Products in this category won't be deleted but will become uncategorised.</>,
+          confirmText: 'Delete category',
+          confirmColor: '#fff',
+          confirmBg: '#ef4444',
+          icon: <Trash2 size={22} color="#ef4444" strokeWidth={2.5} />,
+          iconBg: 'rgba(239,68,68,0.1)',
         };
       default:
         return null;
@@ -167,7 +217,7 @@ const ActionConfirmModal: React.FC<ActionConfirmModalProps> = ({
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                 }}
               >
-                {(actionType === 'delete' || actionType === 'hard_delete' || actionType === 'delete_product') && (
+                {(actionType === 'delete' || actionType === 'hard_delete' || actionType === 'delete_product' || actionType === 'delete_member' || actionType === 'delete_offer' || actionType === 'delete_coupon' || actionType === 'delete_review' || actionType === 'delete_category') && (
                   <Trash2 size={14} strokeWidth={2.5} />
                 )}
                 {(actionType === 'activate') && <CheckCircle size={14} strokeWidth={2.5} />}

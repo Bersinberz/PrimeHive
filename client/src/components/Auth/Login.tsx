@@ -53,7 +53,9 @@ const LoginForm: React.FC<LoginFormProps> = ({ setIsLogin }) => {
     try {
       setLoading(true);
       const user = await login(trimmedEmail, password);
-      if (user.role === "superadmin" || user.role === "staff") {
+      if (user.role === "delivery_partner") {
+        navigate("/delivery/dashboard");
+      } else if (["superadmin", "staff", "admin_staff"].includes(user.role)) {
         navigate("/admin/dashboard");
       } else {
         navigate("/");

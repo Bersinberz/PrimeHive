@@ -416,14 +416,14 @@ const OffersManagement: React.FC = () => {
 
       <ActionConfirmModal
         isOpen={!!offerToDelete}
-        actionType="delete_product"
+        actionType="delete_offer"
         itemName={offerToDelete?.label ?? ""}
         onConfirm={confirmDeleteOffer}
         onCancel={() => setOfferToDelete(null)}
       />
       <ActionConfirmModal
         isOpen={!!couponToDelete}
-        actionType="delete_product"
+        actionType="delete_coupon"
         itemName={couponToDelete?.code ?? ""}
         onConfirm={confirmDeleteCoupon}
         onCancel={() => setCouponToDelete(null)}

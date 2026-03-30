@@ -49,6 +49,9 @@ export interface IOrder extends Document {
     timeline: ITimelineEvent[];
     couponCode?: string;
     couponDiscount?: number;
+    deliveryPartnerId?: mongoose.Types.ObjectId;
+    deliveryStatus?: "not_assigned" | "assigned" | "picked_up" | "out_for_delivery" | "delivered";
+    proofOfDelivery?: string;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -137,6 +140,13 @@ const OrderSchema = new Schema<IOrder>(
         },
         couponCode: { type: String },
         couponDiscount: { type: Number, min: 0 },
+        deliveryPartnerId: { type: Schema.Types.ObjectId, ref: "User", default: null },
+        deliveryStatus: {
+            type: String,
+            enum: ["not_assigned", "assigned", "picked_up", "out_for_delivery", "delivered"],
+            default: "not_assigned",
+        },
+        proofOfDelivery: { type: String, default: null },
         refundStatus: {
             type: String,
             enum: ["none", "pending_refund", "refunded", "rejected"],

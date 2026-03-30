@@ -84,7 +84,7 @@ const ReviewManagement: React.FC = () => {
       <PrimeLoader isLoading={loading} />
       <ActionConfirmModal
         isOpen={!!toDelete}
-        actionType="delete_product"
+        actionType="delete_review"
         itemName={toDelete?.title ?? ''}
         onConfirm={handleDelete}
         onCancel={() => setToDelete(null)}
@@ -185,3 +185,4 @@ const ReviewManagement: React.FC = () => {
 };
 
 export default ReviewManagement;
+

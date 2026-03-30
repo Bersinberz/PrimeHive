@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import {
   getOrders,
@@ -28,8 +28,7 @@ const OrderManagement: React.FC = () => {
     ['Cancelled', 'Refunded', 'Delivered'].includes(status);
   const { showToast } = useToast();
 
-  // Fetch orders on mount
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     setIsLoading(true);
     try {
       const data = await getOrders();
@@ -39,11 +38,11 @@ const OrderManagement: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [showToast]);
 
   useEffect(() => {
     fetchOrders();
-  }, []);
+  }, [fetchOrders]);
 
   const handleViewDetails = async (order: Order) => {
     setIsLoading(true);
@@ -191,6 +190,11 @@ const OrderManagement: React.FC = () => {
                           }}>
                             {o.status}
                           </span>
+                          {o.refundStatus === 'pending_refund' && (
+                            <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#d97706', background: 'rgba(245,158,11,0.1)', padding: '3px 8px', borderRadius: '20px', marginLeft: 4 }}>
+                              Refund Pending
+                            </span>
+                          )}
                         </td>
                         <td className="py-3 px-4 border-light text-end fw-bolder text-dark">₹{o.totalAmount?.toFixed(2)}</td>
                         <td className="py-3 px-4 border-light text-end">
@@ -464,6 +468,16 @@ const OrderManagement: React.FC = () => {
                     <p style={{ color: '#1a1a1a', fontSize: '0.9rem', fontWeight: 700, margin: 0 }}>
                       {selectedOrder.paymentMethod || 'N/A'}
                     </p>
+                    {selectedOrder.refundStatus && selectedOrder.refundStatus !== 'none' && (
+                      <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 10, background: selectedOrder.refundStatus === 'pending_refund' ? 'rgba(245,158,11,0.08)' : selectedOrder.refundStatus === 'refunded' ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)', border: `1px solid ${selectedOrder.refundStatus === 'pending_refund' ? 'rgba(245,158,11,0.2)' : selectedOrder.refundStatus === 'refunded' ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}` }}>
+                        <p style={{ margin: '0 0 4px', fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.8px', color: selectedOrder.refundStatus === 'pending_refund' ? '#d97706' : selectedOrder.refundStatus === 'refunded' ? '#059669' : '#dc2626' }}>
+                          Refund {selectedOrder.refundStatus.replace('_', ' ')}
+                        </p>
+                        {selectedOrder.refundReason && (
+                          <p style={{ margin: 0, fontSize: '0.82rem', color: '#666' }}>{selectedOrder.refundReason}</p>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                 </div>

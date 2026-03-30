@@ -31,17 +31,10 @@ export const getSettings = async (req: Request, res: Response) => {
 export const updateSettings = async (req: Request, res: Response) => {
     try {
         const allowedFields = [
-            "storeName",
-            "supportEmail",
-            "supportPhone",
-            "storeLocation",
-            "currency",
-            "timezone",
-            "orderIdPrefix",
-            "standardShippingRate",
-            "freeShippingThreshold",
-            "taxRate",
-            "taxInclusive",
+            "storeName", "supportEmail", "supportPhone", "storeLocation",
+            "currency", "timezone", "orderIdPrefix",
+            "standardShippingRate", "freeShippingThreshold",
+            "taxRate", "taxInclusive",
         ];
 
         // Whitelist: only pick allowed fields from the body

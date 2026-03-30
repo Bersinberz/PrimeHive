@@ -27,6 +27,15 @@ export interface Permissions {
   settings:   { view: boolean; edit: boolean };
 }
 
+export interface AdminStaffPermissions {
+  staff:     { view: boolean };
+  orders:    { view: boolean; updateStatus: boolean };
+  customers: { view: boolean; edit: boolean };
+  offers:    { view: boolean; create: boolean; edit: boolean; delete: boolean };
+  reviews:   { view: boolean; moderate: boolean; delete: boolean };
+  returns:   { view: boolean; process: boolean };
+}
+
 export interface AuthUser {
   id: string;
   name: string;
@@ -35,6 +44,7 @@ export interface AuthUser {
   profilePicture?: string;
   role: string;
   permissions?: Permissions | null;
+  adminStaffPermissions?: AdminStaffPermissions | null;
 }
 
 export interface AuthResponse {

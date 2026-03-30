@@ -1,12 +1,16 @@
-import { IPermissions } from "../models/User";
+import { IPermissions, IAdminStaffPermissions } from "../models/User";
 
-// Extend the Express Request interface to include user data from JWT
-declare namespace Express {
+declare global {
+  namespace Express {
     interface Request {
-        user?: {
-            id: string;
-            role: string;
-            permissions?: IPermissions;
-        };
+      user?: {
+        id: string;
+        role: string;
+        permissions?: IPermissions;
+        adminStaffPermissions?: IAdminStaffPermissions;
+      };
     }
+  }
 }
+
+export {};

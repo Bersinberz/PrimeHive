@@ -50,6 +50,8 @@ export interface Order {
     paymentMethod: string;
     shippingAddress: ShippingAddress;
     status: OrderStatus;
+    refundStatus?: "none" | "pending_refund" | "refunded" | "rejected";
+    refundReason?: string;
     timeline: TimelineEvent[];
     createdAt: string;
     updatedAt: string;

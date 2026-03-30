@@ -115,7 +115,7 @@ const CategoryManagement: React.FC = () => {
       <PrimeLoader isLoading={isLoading || isSaving} />
       <ActionConfirmModal
         isOpen={!!categoryToDelete}
-        actionType="delete"
+        actionType="delete_category"
         itemName={categoryToDelete?.name || ''}
         onConfirm={confirmDelete}
         onCancel={() => setCategoryToDelete(null)}

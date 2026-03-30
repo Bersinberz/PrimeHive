@@ -28,13 +28,18 @@ export const verifyToken = async (
       role: string;
     };
 
-    // For staff, fetch permissions from DB so they're always up-to-date
-    if (decoded.role === "staff") {
-      const user = await User.findById(decoded.id).select("role status permissions");
+    // For staff and admin_staff, fetch permissions from DB so they're always up-to-date
+    if (decoded.role === "staff" || decoded.role === "admin_staff") {
+      const user = await User.findById(decoded.id).select("role status permissions adminStaffPermissions");
       if (!user || user.status !== "active") {
         return res.status(401).json({ message: "Account is inactive or not found." });
       }
-      req.user = { id: decoded.id, role: decoded.role, permissions: user.permissions };
+      req.user = {
+        id: decoded.id,
+        role: decoded.role,
+        permissions: decoded.role === "staff" ? user.permissions : undefined,
+        adminStaffPermissions: decoded.role === "admin_staff" ? user.adminStaffPermissions : undefined,
+      };
     } else {
       req.user = { id: decoded.id, role: decoded.role };
     }
@@ -46,7 +51,7 @@ export const verifyToken = async (
 };
 
 /**
- * Allow superadmin + staff (any staff, permission checks done separately)
+ * Allow superadmin + staff + admin_staff
  */
 export const adminOnly = (
   req: Request,
@@ -54,8 +59,23 @@ export const adminOnly = (
   next: NextFunction
 ) => {
   if (!req.user) return res.status(401).json({ message: "Not authorized" });
-  if (req.user.role !== "superadmin" && req.user.role !== "staff") {
+  if (!["superadmin", "staff", "admin_staff"].includes(req.user.role)) {
     return res.status(403).json({ message: "Admin access required" });
+  }
+  next();
+};
+
+/**
+ * Delivery partner only
+ */
+export const deliveryPartnerOnly = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  if (!req.user) return res.status(401).json({ message: "Not authorized" });
+  if (!["delivery_partner", "superadmin"].includes(req.user.role)) {
+    return res.status(403).json({ message: "Delivery partner access required" });
   }
   next();
 };
@@ -90,6 +110,20 @@ export const checkPermission = (
   // Superadmin bypasses all permission checks
   if (req.user.role === "superadmin") return next();
 
+  // admin_staff — check adminStaffPermissions
+  if (req.user.role === "admin_staff") {
+    // dashboard, products, categories always allowed
+    if (["dashboard", "products", "categories"].includes(module)) return next();
+    const adminPerms = req.user.adminStaffPermissions as Record<string, any> | undefined;
+    if (!adminPerms) return next(); // no perms set yet — allow, server data is read-only anyway
+    const modulePerms = adminPerms[module] as Record<string, boolean> | undefined;
+    if (!modulePerms || !modulePerms[action]) {
+      return res.status(403).json({ message: "You don't have permission to perform this action." });
+    }
+    return next();
+  }
+
+  // staff (seller) — check permissions
   const perms = req.user.permissions;
   if (!perms) {
     return res.status(403).json({ message: "No permissions assigned to this account." });
@@ -97,9 +131,7 @@ export const checkPermission = (
 
   const modulePerms = perms[module] as Record<string, boolean> | undefined;
   if (!modulePerms || !modulePerms[action]) {
-    return res.status(403).json({
-      message: `You don't have permission to perform this action.`
-    });
+    return res.status(403).json({ message: "You don't have permission to perform this action." });
   }
 
   next();

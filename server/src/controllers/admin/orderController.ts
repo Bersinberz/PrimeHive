@@ -6,8 +6,8 @@ import { asyncHandler } from "../../utils/asyncHandler";
 import { sendOrderStatusEmail } from "../../utils/sendOrderStatusEmail";
 
 export const getOrders = asyncHandler(async (req: Request, res: Response) => {
-  const page  = Math.max(1, parseInt(req.query.page as string) || 1);
-  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 50));
+  const page  = Math.max(1, parseInt(req.query.page as string, 10) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string, 10) || 50));
   const search = (req.query.search as string || "").trim();
   const skip  = (page - 1) * limit;
 
@@ -80,8 +80,8 @@ export const updateOrderStatus = asyncHandler(async (req: Request, res: Response
 
 /** GET /admin/orders/refunds — list all pending_refund orders */
 export const getRefundRequests = asyncHandler(async (req: Request, res: Response) => {
-  const page  = Math.max(1, parseInt(req.query.page as string) || 1);
-  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 50));
+  const page  = Math.max(1, parseInt(req.query.page as string, 10) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string, 10) || 50));
   const skip  = (page - 1) * limit;
 
   const filter: any = { refundStatus: "pending_refund" };
@@ -146,3 +146,4 @@ export const processRefundDecision = asyncHandler(async (req: Request, res: Resp
 
   res.status(200).json({ message: `Refund ${decision}`, order });
 });
+

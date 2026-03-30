@@ -223,6 +223,9 @@ export const login = async (req: Request, res: Response) => {
         profilePicture: user.profilePicture,
         role: user.role,
         permissions: user.role === "staff" ? (user.permissions ?? null) : undefined,
+        adminStaffPermissions: user.role === "admin_staff" ? (user.adminStaffPermissions ?? { staff: { view: false }, orders: { view: true, updateStatus: false }, customers: { view: true, edit: false }, offers: { view: true, create: false, edit: false, delete: false }, reviews: { view: true, moderate: false, delete: false }, returns: { view: true, process: false } }) : undefined,
+        vehicleType:   user.role === "delivery_partner" ? user.vehicleType   : undefined,
+        vehicleNumber: user.role === "delivery_partner" ? user.vehicleNumber : undefined,
       }
     });
   } catch (error) {
@@ -305,6 +308,9 @@ export const refreshSession = async (req: Request, res: Response) => {
         profilePicture: user.profilePicture,
         role: user.role,
         permissions: user.role === "staff" ? (user.permissions ?? null) : undefined,
+        adminStaffPermissions: user.role === "admin_staff" ? (user.adminStaffPermissions ?? { staff: { view: false }, orders: { view: true, updateStatus: false }, customers: { view: true, edit: false }, offers: { view: true, create: false, edit: false, delete: false }, reviews: { view: true, moderate: false, delete: false }, returns: { view: true, process: false } }) : undefined,
+        vehicleType:   user.role === "delivery_partner" ? user.vehicleType   : undefined,
+        vehicleNumber: user.role === "delivery_partner" ? user.vehicleNumber : undefined,
       }
     });
   } catch (error) {
@@ -511,3 +517,4 @@ export const resetPassword = async (req: Request, res: Response) => {
     return res.status(500).json({ message: "Internal Server Error" });
   }
 };
+

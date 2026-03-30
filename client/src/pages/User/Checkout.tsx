@@ -186,13 +186,6 @@ const CheckoutPage: React.FC = () => {
               email:   user?.email || guestEmail || "",
               contact: (user as any)?.phone || "",
             },
-            method: {
-              upi:        true,
-              card:       true,
-              netbanking: true,
-              wallet:     true,
-              emi:        false,
-            },
             theme: { color: "#ff8c42" },
             handler: async (response: any) => {
               try {

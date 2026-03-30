@@ -41,6 +41,9 @@ import adminCouponRoutes from "./routes/admin/couponRoutes";
 import adminReviewRoutes from "./routes/admin/reviewRoutes";
 import adminReturnRoutes from "./routes/admin/returnRoutes";
 import adminAuditLogRoutes from "./routes/admin/auditLogRoutes";
+import adminStaffMgmtRoutes from "./routes/admin/adminStaffRoutes";
+import adminDeliveryPartnerRoutes from "./routes/admin/deliveryPartnerRoutes";
+import deliveryRoutes from "./routes/delivery/deliveryRoutes";
 import publicSettingsRoutes from "./routes/publicSettingsRoutes";
 import storefrontProductRoutes from "./routes/storefront/productRoutes";
 import storefrontCategoryRoutes from "./routes/storefront/categoryRoutes";
@@ -175,7 +178,10 @@ app.use("/api/v1/admin/offers",      adminLimiter, adminOfferRoutes);
 app.use("/api/v1/admin/coupons",     adminLimiter, adminCouponRoutes);
 app.use("/api/v1/admin/reviews",     adminLimiter, adminReviewRoutes);
 app.use("/api/v1/admin/returns",     adminLimiter, adminReturnRoutes);
-app.use("/api/v1/admin/audit-logs",  adminLimiter, adminAuditLogRoutes);
+app.use("/api/v1/admin/audit-logs",       adminLimiter, adminAuditLogRoutes);
+app.use("/api/v1/admin/admin-staff",      adminLimiter, adminStaffMgmtRoutes);
+app.use("/api/v1/admin/delivery-partners", adminLimiter, adminDeliveryPartnerRoutes);
+app.use("/api/v1/delivery",               adminLimiter, deliveryRoutes);
 
 // ==========================================
 // Storefront Routes (Public + User)
