@@ -1,0 +1,71 @@
+version: "3.9"
+
+services:
+  mongo:
+    image: mongo:7.0
+    container_name: primehive_mongo_dev
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_dev_data:/data/db
+    networks:
+      - primehive_dev
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: primehive_redis_dev
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - primehive_dev
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+      target: builder
+    container_name: primehive_server_dev
+    restart: unless-stopped
+    command: npm run dev
+    ports:
+      - "5000:5000"
+    env_file:
+      - ./server/.env.development
+    environment:
+      MONGODB_URI: mongodb://mongo:27017/primehive
+      REDIS_URL: redis://redis:6379
+    volumes:
+      - ./server/src:/app/src
+    depends_on:
+      - mongo
+      - redis
+    networks:
+      - primehive_dev
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+      target: builder
+    container_name: primehive_client_dev
+    restart: unless-stopped
+    command: npm run dev -- --host
+    ports:
+      - "5173:5173"
+    env_file:
+      - ./client/.env
+    volumes:
+      - ./client/src:/app/src
+    depends_on:
+      - server
+    networks:
+      - primehive_dev
+
+volumes:
+  mongo_dev_data:
+
+networks:
+  primehive_dev:
+    driver: bridge
