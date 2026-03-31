@@ -2,10 +2,11 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useSearchParams, useOutletContext } from 'react-router-dom';
 import {
-  Package, ChevronRight, RefreshCw, Search, Phone, MapPin,
-  CheckCircle2, XCircle, Clock, IndianRupee, AlertTriangle,
+  Package, ChevronRight, RefreshCw, Search, Phone,
+  CheckCircle2, XCircle, Clock, IndianRupee, AlertTriangle, RotateCcw,
 } from 'lucide-react';
 import { getMyDeliveries, acceptOrder, rejectOrder, type DeliveryOrder } from '../../services/delivery/deliveryService';
+import axiosInstance from '../../services/axiosInstance';
 import { useToast } from '../../context/ToastContext';
 import { OrderCardSkeleton, SHIMMER_CSS } from '../../components/Delivery/DeliverySkeleton';
 
@@ -52,6 +53,7 @@ const DeliveryOrders: React.FC = () => {
 
   const [tab, setTab]         = useState(searchParams.get('status') || '');
   const [orders, setOrders]   = useState<DeliveryOrder[]>([]);
+  const [returnPickups, setReturnPickups] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch]   = useState('');
   const [acting, setActing]   = useState<string | null>(null);
@@ -61,8 +63,12 @@ const DeliveryOrders: React.FC = () => {
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const res = await getMyDeliveries({ deliveryStatus: tab || undefined });
+      const [res, retRes] = await Promise.all([
+        getMyDeliveries({ deliveryStatus: tab || undefined }),
+        tab === '' || tab === 'assigned' ? axiosInstance.get('/delivery/returns') : Promise.resolve({ data: { data: [] } }),
+      ]);
       setOrders(res.data);
+      setReturnPickups((retRes as any).data?.data || []);
     } catch { /* silent */ }
     finally { if (!silent) setLoading(false); }
   }, [tab]);
@@ -161,6 +167,85 @@ const DeliveryOrders: React.FC = () => {
       )}
 
       {!loading && <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {/* Return pickup cards */}
+        {returnPickups.map((rp, i) => {
+          const isAssigned = rp.returnPickupStatus === 'assigned';
+          const isAccepted = rp.returnPickupStatus === 'pickup_accepted';
+          const isPickedUp = rp.returnPickupStatus === 'picked_up';
+
+          return (
+            <motion.div key={rp._id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
+              style={{ background: surface, borderRadius: 18, overflow: 'hidden', border: isAssigned ? '2px solid rgba(124,58,237,0.4)' : `1px solid ${border}`, boxShadow: isAssigned ? '0 4px 20px rgba(124,58,237,0.1)' : '0 1px 6px rgba(0,0,0,0.04)' }}>
+
+              {/* Banner */}
+              <div style={{ background: 'linear-gradient(90deg,#7c3aed,#8b5cf6)', padding: '5px 14px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <RotateCcw size={11} color="#fff" />
+                <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+                  {isAssigned ? 'Return Pickup Request' : isPickedUp ? 'Return · Picked Up' : 'Return · Accepted'}
+                </span>
+              </div>
+
+              {/* Card body — tappable only after accepted */}
+              <div
+                onClick={() => !isAssigned && navigate(`/delivery/returns/${rp._id}`)}
+                style={{ padding: '14px 16px', cursor: isAssigned ? 'default' : 'pointer' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                  <div>
+                    <span style={{ fontWeight: 900, fontSize: '0.9rem', color: text }}>{rp.orderId}</span>
+                    {!isAssigned && <p style={{ margin: '2px 0 0', fontSize: '0.82rem', fontWeight: 700, color: text }}>{rp.customer?.name}</p>}
+                  </div>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#7c3aed', background: 'rgba(124,58,237,0.1)', padding: '3px 9px', borderRadius: 20, whiteSpace: 'nowrap' }}>
+                    {rp.returnPickupStatus?.replace(/_/g, ' ')}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: dark ? 'rgba(255,255,255,0.05)' : '#f5f5f7', borderRadius: 8, padding: '3px 9px' }}>
+                    <Package size={10} color={muted} />
+                    <span style={{ fontSize: '0.68rem', color: muted, fontWeight: 600 }}>{rp.items?.length || 0} item{rp.items?.length !== 1 ? 's' : ''}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 3, background: 'rgba(124,58,237,0.08)', borderRadius: 8, padding: '3px 9px' }}>
+                    <IndianRupee size={10} color="#7c3aed" />
+                    <span style={{ fontSize: '0.68rem', color: '#7c3aed', fontWeight: 700 }}>₹50 / pickup</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action bar */}
+              <div style={{ borderTop: `1px solid ${border}`, padding: '10px 14px', display: 'flex', gap: 6, alignItems: 'center' }}>
+                {isAssigned && (
+                  <>
+                    <button onClick={async e => {
+                      e.stopPropagation();
+                      try {
+                        await axiosInstance.put(`/delivery/returns/${rp._id}/reject`);
+                        setReturnPickups(prev => prev.filter(r => r._id !== rp._id));
+                        showToast({ type: 'success', title: 'Rejected', message: 'Return pickup rejected.' });
+                      } catch { showToast({ type: 'error', title: 'Error', message: 'Failed.' }); }
+                    }} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '8px', borderRadius: 9, border: '1.5px solid rgba(239,68,68,0.3)', background: 'transparent', color: '#ef4444', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer' }}>
+                      <XCircle size={13} /> Reject
+                    </button>
+                    <button onClick={async e => {
+                      e.stopPropagation();
+                      try {
+                        await axiosInstance.put(`/delivery/returns/${rp._id}/accept`);
+                        setReturnPickups(prev => prev.map(r => r._id === rp._id ? { ...r, returnPickupStatus: 'pickup_accepted' } : r));
+                        showToast({ type: 'success', title: 'Accepted', message: 'Return pickup accepted. Tap card for details.' });
+                      } catch { showToast({ type: 'error', title: 'Error', message: 'Failed.' }); }
+                    }} style={{ flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '8px', borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#7c3aed,#8b5cf6)', color: '#fff', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer' }}>
+                      <CheckCircle2 size={13} /> Accept Pickup
+                    </button>
+                  </>
+                )}
+                {!isAssigned && (
+                  <button onClick={() => navigate(`/delivery/returns/${rp._id}`)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 11px', borderRadius: 9, border: `1px solid ${border}`, background: 'transparent', color: muted, fontWeight: 700, fontSize: '0.7rem', cursor: 'pointer' }}>
+                    Details <ChevronRight size={12} />
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          );
+        })}
         {sorted.length === 0 && !loading && (
           <div style={{ textAlign: 'center', padding: '48px 0', color: muted }}>
             <Package size={36} style={{ marginBottom: 10, opacity: 0.25 }} />
@@ -188,12 +273,13 @@ const DeliveryOrders: React.FC = () => {
               {isNew && (
                 <div style={{ background: 'linear-gradient(90deg,#2563eb,#3b82f6)', padding: '5px 14px', display: 'flex', alignItems: 'center', gap: 6 }}>
                   <AlertTriangle size={11} color="#fff" />
-                  <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.8px' }}>New Order Assigned</span>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.8px' }}>New Order Request</span>
                 </div>
               )}
 
               {/* Card body */}
-              <div onClick={() => navigate(`/delivery/orders/${order._id}`)} style={{ padding: '14px 16px', cursor: 'pointer' }}>
+              <div onClick={() => !isNew && navigate(`/delivery/orders/${order._id}`)}
+                style={{ padding: '14px 16px', cursor: isNew ? 'default' : 'pointer' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 2 }}>
@@ -202,7 +288,8 @@ const DeliveryOrders: React.FC = () => {
                         {cod ? '💵 COD' : '✅ Paid'}
                       </span>
                     </div>
-                    <p style={{ margin: 0, fontSize: '0.82rem', fontWeight: 700, color: text }}>{order.customer?.name}</p>
+                    {/* Only show customer name after accepting */}
+                    {!isNew && <p style={{ margin: 0, fontSize: '0.82rem', fontWeight: 700, color: text }}>{order.customer?.name}</p>}
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
                     <span style={{ fontSize: '0.65rem', fontWeight: 700, color: sm.color, background: sm.bg, padding: '3px 9px', borderRadius: 20, whiteSpace: 'nowrap' }}>{sm.label}</span>
@@ -210,20 +297,20 @@ const DeliveryOrders: React.FC = () => {
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, minWidth: 0 }}>
-                    <MapPin size={11} color={muted} style={{ flexShrink: 0 }} />
-                    <span style={{ fontSize: '0.73rem', color: muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {[addr?.line1, addr?.city, addr?.state].filter(Boolean).join(', ')}
+                {/* For assigned: only show items count + time. For others: show address too */}
+                {!isNew && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <span style={{ fontSize: '0.73rem', color: muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                      {[addr?.city, addr?.state].filter(Boolean).join(', ')}
                     </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0, marginLeft: 8 }}>
+                      <Clock size={10} color={muted} />
+                      <span style={{ fontSize: '0.68rem', color: muted, fontWeight: 600 }}>{timeAgo(order.assignedAt || order.createdAt)}</span>
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0, marginLeft: 8 }}>
-                    <Clock size={10} color={muted} />
-                    <span style={{ fontSize: '0.68rem', color: muted, fontWeight: 600 }}>{timeAgo(order.assignedAt || order.createdAt)}</span>
-                  </div>
-                </div>
+                )}
 
-                <div style={{ display: 'flex', gap: 6 }}>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: dark ? 'rgba(255,255,255,0.05)' : '#f5f5f7', borderRadius: 8, padding: '3px 9px' }}>
                     <Package size={10} color={muted} />
                     <span style={{ fontSize: '0.68rem', color: muted, fontWeight: 600 }}>{order.items.length} item{order.items.length !== 1 ? 's' : ''}</span>
@@ -232,45 +319,44 @@ const DeliveryOrders: React.FC = () => {
                     <IndianRupee size={10} color="#059669" />
                     <span style={{ fontSize: '0.68rem', color: '#059669', fontWeight: 700 }}>₹50 / delivery</span>
                   </div>
+                  {isNew && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0, marginLeft: 'auto' }}>
+                      <Clock size={10} color={muted} />
+                      <span style={{ fontSize: '0.68rem', color: muted, fontWeight: 600 }}>{timeAgo(order.assignedAt || order.createdAt)}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
               {/* Action bar */}
-              <div style={{ borderTop: `1px solid ${border}`, padding: '10px 14px', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                <a href={`tel:${order.customer?.phone}`} onClick={e => e.stopPropagation()}
-                  style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 11px', borderRadius: 9, background: 'rgba(37,99,235,0.08)', color: '#2563eb', textDecoration: 'none', fontWeight: 700, fontSize: '0.7rem' }}>
-                  <Phone size={12} /> Call
-                </a>
-                <a href={`https://wa.me/${order.customer?.phone?.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}
-                  style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 11px', borderRadius: 9, background: 'rgba(37,211,102,0.1)', color: '#25d366', textDecoration: 'none', fontWeight: 700, fontSize: '0.7rem' }}>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-                  WhatsApp
-                </a>
-                <a href={mapsUrl} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}
-                  style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 11px', borderRadius: 9, background: 'rgba(16,185,129,0.08)', color: '#059669', textDecoration: 'none', fontWeight: 700, fontSize: '0.7rem' }}>
-                  <MapPin size={12} /> Maps
-                </a>
-
-                <div style={{ flex: 1 }} />
-
-                {order.deliveryStatus === 'assigned' && (
+              <div style={{ borderTop: `1px solid ${border}`, padding: '10px 14px', display: 'flex', gap: 6, alignItems: 'center' }}>
+                {/* Assigned: only Accept / Reject */}
+                {isNew && (
                   <>
                     <button onClick={e => handleReject(order._id, e)} disabled={acting === order._id}
-                      style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 11px', borderRadius: 9, border: '1.5px solid rgba(239,68,68,0.3)', background: 'transparent', color: '#ef4444', fontWeight: 700, fontSize: '0.7rem', cursor: 'pointer' }}>
-                      <XCircle size={12} /> Reject
+                      style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '8px', borderRadius: 9, border: '1.5px solid rgba(239,68,68,0.3)', background: 'transparent', color: '#ef4444', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer' }}>
+                      <XCircle size={13} /> Reject
                     </button>
                     <button onClick={e => handleAccept(order._id, e)} disabled={acting === order._id}
-                      style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 11px', borderRadius: 9, border: 'none', background: 'var(--prime-gradient)', color: '#fff', fontWeight: 700, fontSize: '0.7rem', cursor: 'pointer' }}>
-                      <CheckCircle2 size={12} /> Accept
+                      style={{ flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '8px', borderRadius: 9, border: 'none', background: 'var(--prime-gradient)', color: '#fff', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer' }}>
+                      <CheckCircle2 size={13} /> Accept Order
                     </button>
                   </>
                 )}
 
-                {order.deliveryStatus !== 'assigned' && (
-                  <button onClick={() => navigate(`/delivery/orders/${order._id}`)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 11px', borderRadius: 9, border: `1px solid ${border}`, background: 'transparent', color: muted, fontWeight: 700, fontSize: '0.7rem', cursor: 'pointer' }}>
-                    Details <ChevronRight size={12} />
-                  </button>
+                {/* Accepted: Call + Details */}
+                {!isNew && (
+                  <>
+                    <a href={`tel:${order.customer?.phone}`} onClick={e => e.stopPropagation()}
+                      style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 11px', borderRadius: 9, background: 'rgba(37,99,235,0.08)', color: '#2563eb', textDecoration: 'none', fontWeight: 700, fontSize: '0.7rem' }}>
+                      <Phone size={12} /> Call
+                    </a>
+                    <div style={{ flex: 1 }} />
+                    <button onClick={() => navigate(`/delivery/orders/${order._id}`)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 11px', borderRadius: 9, border: `1px solid ${border}`, background: 'transparent', color: muted, fontWeight: 700, fontSize: '0.7rem', cursor: 'pointer' }}>
+                      Details <ChevronRight size={12} />
+                    </button>
+                  </>
                 )}
               </div>
             </motion.div>

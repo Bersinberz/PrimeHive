@@ -3,7 +3,7 @@ import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, Package, LogOut, User, Moon, Sun,
-  Phone, AlertCircle, Bell,
+  Phone, AlertCircle, Bell, Settings, IndianRupee,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import Logo from '../../assets/Logo.png';
@@ -16,6 +16,8 @@ const DARK_KEY   = 'delivery_dark';
 const NAV = [
   { path: '/delivery/dashboard', label: 'Dashboard', Icon: LayoutDashboard },
   { path: '/delivery/orders',    label: 'Deliveries', Icon: Package },
+  { path: '/delivery/earnings',  label: 'Earnings',   Icon: IndianRupee },
+  { path: '/delivery/settings',  label: 'Settings',   Icon: Settings },
 ];
 
 const DeliveryLayout: React.FC = () => {
@@ -191,21 +193,24 @@ const DeliveryLayout: React.FC = () => {
               {profileOpen && (
                 <motion.div initial={{ opacity: 0, y: 6, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 6, scale: 0.95 }} transition={{ duration: 0.15 }}
                   style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, width: 'min(220px, calc(100vw - 28px))', background: surface, borderRadius: 16, border: `1px solid ${border}`, boxShadow: '0 12px 40px rgba(0,0,0,0.18)', zIndex: 300, overflow: 'hidden' }}>
-                  {/* User info */}
-                  <div style={{ padding: '14px 16px', borderBottom: `1px solid ${border}`, display: 'flex', alignItems: 'center', gap: 10 }}>
+                  {/* User info — click to go to profile */}
+                  <button onClick={() => { navigate('/delivery/profile'); setProfileOpen(false); }}
+                    style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10, width: '100%', background: 'none', border: 'none', borderBottom: `1px solid ${border}`, cursor: 'pointer' } as any}
+                    onMouseEnter={e => (e.currentTarget.style.background = dark ? 'rgba(255,255,255,0.05)' : '#f5f5f5')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
                     <div style={{ width: 38, height: 38, borderRadius: '50%', overflow: 'hidden', flexShrink: 0 }}>
                       <img src={user?.profilePicture || getInitialsAvatar(user?.name || '?')} alt={user?.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     </div>
-                    <div style={{ minWidth: 0 }}>
+                    <div style={{ minWidth: 0, textAlign: 'left' }}>
                       <p style={{ margin: 0, fontWeight: 800, fontSize: '0.85rem', color: text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.name}</p>
-                      <p style={{ margin: 0, fontSize: '0.68rem', color: muted }}>Delivery Partner</p>
+                      <p style={{ margin: 0, fontSize: '0.68rem', color: '#ff8c42' }}>Delivery Partner · Edit Profile</p>
                     </div>
-                  </div>
+                    <Settings size={13} color={muted} style={{ flexShrink: 0, marginLeft: 'auto' }} />
+                  </button>
                   {/* Nav links */}
                   {[
-                    { icon: <LayoutDashboard size={14} />, label: 'Dashboard',       path: '/delivery/dashboard' },
-                    { icon: <Package size={14} />,         label: 'My Deliveries',   path: '/delivery/orders' },
-                    { icon: <Package size={14} />,         label: 'Completed Orders',path: '/delivery/orders?status=delivered' },
+                    { icon: <LayoutDashboard size={14} />, label: 'Dashboard',     path: '/delivery/dashboard' },
+                    { icon: <Package size={14} />,         label: 'My Deliveries', path: '/delivery/orders' },
                   ].map(item => (
                     <button key={item.label} onClick={() => { navigate(item.path); setProfileOpen(false); }}
                       style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '11px 16px', background: 'none', border: 'none', cursor: 'pointer', color: text, fontSize: '0.82rem', fontWeight: 600, textAlign: 'left', WebkitTapHighlightColor: 'transparent' } as any}
@@ -215,13 +220,13 @@ const DeliveryLayout: React.FC = () => {
                     </button>
                   ))}
                   <div style={{ height: 1, background: border }} />
-                  <button onClick={() => { window.location.href = 'tel:+919385598932'; }}
+                  <button onClick={() => { navigate('/delivery/support'); setProfileOpen(false); }}
                     style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '11px 16px', background: 'none', border: 'none', cursor: 'pointer', color: '#2563eb', fontSize: '0.82rem', fontWeight: 600, WebkitTapHighlightColor: 'transparent' } as any}
                     onMouseEnter={e => (e.currentTarget.style.background = dark ? 'rgba(255,255,255,0.05)' : '#f5f5f5')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
                     <Phone size={14} /> Call Support
                   </button>
-                  <button onClick={() => setProfileOpen(false)}
+                  <button onClick={() => { navigate('/delivery/report-issue'); setProfileOpen(false); }}
                     style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '11px 16px', background: 'none', border: 'none', cursor: 'pointer', color: '#f59e0b', fontSize: '0.82rem', fontWeight: 600, WebkitTapHighlightColor: 'transparent' } as any}
                     onMouseEnter={e => (e.currentTarget.style.background = dark ? 'rgba(255,255,255,0.05)' : '#f5f5f5')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
@@ -243,7 +248,7 @@ const DeliveryLayout: React.FC = () => {
 
       {/* ── PAGE CONTENT ── */}
       <main style={{ flex: 1, padding: '16px 14px 84px', maxWidth: 700, margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
-        <Outlet context={{ dark, online, surface, text, muted, border }} />
+        <Outlet context={{ dark, setDark, online, setOnline, surface, text, muted, border }} />
       </main>
 
       {/* ── BOTTOM TAB BAR ── */}
@@ -264,13 +269,6 @@ const DeliveryLayout: React.FC = () => {
             </Link>
           );
         })}
-        <button onClick={() => navigate('/delivery/profile')}
-          style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, background: 'none', border: 'none', cursor: 'pointer', color: location.pathname === '/delivery/profile' ? '#ff8c42' : muted, padding: '8px 0 6px', transition: 'color 0.2s', WebkitTapHighlightColor: 'transparent' }}>
-          <div style={{ width: 34, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, background: location.pathname === '/delivery/profile' ? 'rgba(255,140,66,0.12)' : 'transparent', transition: 'background 0.2s' }}>
-            <User size={18} />
-          </div>
-          <span style={{ fontSize: '0.62rem', fontWeight: 700 }}>Profile</span>
-        </button>
       </div>
     </div>
   );

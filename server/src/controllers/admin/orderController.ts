@@ -76,6 +76,13 @@ export const updateOrderStatus = asyncHandler(async (req: Request, res: Response
   if (customerEmail) {
     sendOrderStatusEmail({ to: customerEmail, customerName, orderId: order.orderId, newStatus: status, note: note || undefined }).catch(() => {});
   }
+
+  // Auto-assign delivery partner when admin sends order to delivery
+  if (status === "Processing" && previousStatus === "Pending") {
+    import("../../utils/autoAssignDelivery").then(({ autoAssignDelivery }) => {
+      autoAssignDelivery(order._id.toString());
+    }).catch(() => {});
+  }
 });
 
 /** GET /admin/orders/refunds — list all pending_refund orders */

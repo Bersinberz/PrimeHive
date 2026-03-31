@@ -60,10 +60,17 @@ const AdminStaffMgmt     = lazy(() => import("./pages/Admin/AdminStaffManagement
 const DeliveryPartnerMgmt = lazy(() => import("./pages/Admin/DeliveryPartnerManagement"));
 
 // ── Delivery Panel ────────────────────────────────────────────
-const DeliveryLayout     = lazy(() => import("./components/Delivery/DeliveryLayout"));
-const DeliveryDashboard  = lazy(() => import("./pages/Delivery/DeliveryDashboard"));
-const DeliveryOrders     = lazy(() => import("./pages/Delivery/DeliveryOrders"));
+const DeliveryLayout      = lazy(() => import("./components/Delivery/DeliveryLayout"));
+const DeliveryDashboard   = lazy(() => import("./pages/Delivery/DeliveryDashboard"));
+const DeliveryOrders      = lazy(() => import("./pages/Delivery/DeliveryOrders"));
 const DeliveryOrderDetail = lazy(() => import("./pages/Delivery/DeliveryOrderDetail"));
+const DeliveryProfile     = lazy(() => import("./pages/Delivery/DeliveryProfile"));
+const DeliverySupport     = lazy(() => import("./pages/Delivery/DeliverySupport"));
+const DeliveryReportIssue = lazy(() => import("./pages/Delivery/DeliveryReportIssue"));
+const DeliveryEarnings    = lazy(() => import("./pages/Delivery/DeliveryEarnings"));
+const DeliverySettings    = lazy(() => import("./pages/Delivery/DeliverySettings"));
+const DeliveryPrivacy     = lazy(() => import("./pages/Delivery/DeliveryPrivacy"));
+const DeliveryReturnDetail = lazy(() => import("./pages/Delivery/DeliveryReturnDetail"));
 
 const PageLoader = () => (
   <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -137,9 +144,16 @@ function App() {
                     {/* Delivery Panel */}
                     <Route path="/delivery" element={<ProtectedRoute allowedRoles={["delivery_partner"]}><DeliveryLayout /></ProtectedRoute>}>
                       <Route index element={<Navigate to="dashboard" replace />} />
-                      <Route path="dashboard" element={<DeliveryDashboard />} />
-                      <Route path="orders"    element={<DeliveryOrders />} />
-                      <Route path="orders/:id" element={<DeliveryOrderDetail />} />
+                      <Route path="dashboard"    element={<DeliveryDashboard />} />
+                      <Route path="orders"       element={<DeliveryOrders />} />
+                      <Route path="orders/:id"   element={<DeliveryOrderDetail />} />
+                      <Route path="profile"      element={<DeliveryProfile />} />
+                      <Route path="support"      element={<DeliverySupport />} />
+                      <Route path="report-issue" element={<DeliveryReportIssue />} />
+                      <Route path="earnings"     element={<DeliveryEarnings />} />
+                      <Route path="settings"     element={<DeliverySettings />} />
+                      <Route path="privacy"      element={<DeliveryPrivacy />} />
+                      <Route path="returns/:id"  element={<DeliveryReturnDetail />} />
                     </Route>
                   </Routes>
                 </Suspense>

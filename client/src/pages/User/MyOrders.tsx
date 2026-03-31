@@ -6,14 +6,14 @@ import { getMyOrders } from "../../services/storefront/orderService";
 import type { MyOrder } from "../../services/storefront/orderService";
 import { useAuth } from "../../context/AuthContext";
 
-const STATUS_META: Record<string, { bg: string; color: string; dot: string }> = {
-  Pending:    { bg: "rgba(245,158,11,0.1)",  color: "#d97706", dot: "#f59e0b" },
-  Paid:       { bg: "rgba(16,185,129,0.1)",  color: "#059669", dot: "#10b981" },
-  Processing: { bg: "rgba(59,130,246,0.1)",  color: "#2563eb", dot: "#3b82f6" },
-  Shipped:    { bg: "rgba(139,92,246,0.1)",  color: "#7c3aed", dot: "#8b5cf6" },
-  Delivered:  { bg: "rgba(16,185,129,0.1)",  color: "#059669", dot: "#10b981" },
-  Cancelled:  { bg: "rgba(239,68,68,0.1)",   color: "#dc2626", dot: "#ef4444" },
-  Refunded:   { bg: "rgba(107,114,128,0.1)", color: "#6b7280", dot: "#9ca3af" },
+const STATUS_META: Record<string, { bg: string; color: string; dot: string; label: string }> = {
+  Pending:    { bg: "rgba(245,158,11,0.1)",  color: "#d97706", dot: "#f59e0b", label: "Order Placed" },
+  Paid:       { bg: "rgba(245,158,11,0.1)",  color: "#d97706", dot: "#f59e0b", label: "Order Placed" },
+  Processing: { bg: "rgba(59,130,246,0.1)",  color: "#2563eb", dot: "#3b82f6", label: "Sent to Delivery" },
+  Shipped:    { bg: "rgba(139,92,246,0.1)",  color: "#7c3aed", dot: "#8b5cf6", label: "Out for Delivery" },
+  Delivered:  { bg: "rgba(16,185,129,0.1)",  color: "#059669", dot: "#10b981", label: "Delivered" },
+  Cancelled:  { bg: "rgba(239,68,68,0.1)",   color: "#dc2626", dot: "#ef4444", label: "Cancelled" },
+  Refunded:   { bg: "rgba(107,114,128,0.1)", color: "#6b7280", dot: "#9ca3af", label: "Refunded" },
 };
 
 const fmt = (n: number) =>
@@ -130,7 +130,7 @@ const MyOrdersPage: React.FC = () => {
                     <span className="badge rounded-pill px-2 py-1 fw-bold"
                       style={{ background: s.bg, color: s.color, fontSize: "0.72rem" }}>
                       <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: s.dot, marginRight: 5, verticalAlign: "middle" }} />
-                      {order.status}
+                      {s.label}
                     </span>
                     <ChevronRight size={16} style={{ color: "var(--text-muted)" }} />
                   </div>

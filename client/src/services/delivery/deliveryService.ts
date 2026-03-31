@@ -14,6 +14,7 @@ export interface DeliveryOrder {
   deliveryOtpVerified?: boolean;
   assignedAt?: string;
   createdAt: string;
+  seller?: { storeName?: string; storePhone?: string; storeLocation?: string };
 }
 
 export const getMyDeliveries = async (params?: { deliveryStatus?: string; page?: number }): Promise<{ data: DeliveryOrder[]; pagination: any }> => {
@@ -43,10 +44,16 @@ export const toggleOnlineStatus = async (isOnline: boolean): Promise<void> => {
 };
 
 export const getMyEarnings = async (): Promise<{
-  today: number; thisWeek: number; total: number; perOrder: number; todayCount: number; totalCount: number;
+  today: number; thisWeek: number; total: number; perOrder: number;
+  todayCount: number; totalCount: number;
+  orders: { orderId: string; earned: number; amount: number; city: string; deliveredAt: string }[];
 }> => {
   const { data } = await axiosInstance.get('/delivery/earnings');
   return data;
+};
+
+export const deleteMyAccount = async (): Promise<void> => {
+  await axiosInstance.delete('/delivery/account');
 };
 
 export interface DeliveryNotification {

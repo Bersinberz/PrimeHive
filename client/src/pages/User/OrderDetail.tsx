@@ -19,9 +19,19 @@ const STATUS_META: Record<string, { bg: string; color: string; dot: string }> = 
   Refunded:   { bg: "rgba(107,114,128,0.1)", color: "#6b7280", dot: "#9ca3af" },
 };
 
+const STATUS_LABELS: Record<string, string> = {
+  Pending:    "Order Placed",
+  Paid:       "Order Placed",
+  Processing: "Sent to Delivery",
+  Shipped:    "Out for Delivery",
+  Delivered:  "Delivered",
+  Cancelled:  "Cancelled",
+  Refunded:   "Refunded",
+};
+
 const PIPELINE: { key: string; label: string; sub: string; Icon: React.FC<any> }[] = [
   { key: "Pending",    label: "Order Placed",      sub: "We've received your order",     Icon: ShoppingBag },
-  { key: "Processing", label: "Picked Up",         sub: "Preparing your items",          Icon: Settings },
+  { key: "Processing", label: "Sent to Delivery",  sub: "Preparing your items",          Icon: Settings },
   { key: "Shipped",    label: "Out for Delivery",  sub: "On the way to you",             Icon: Truck },
   { key: "Delivered",  label: "Delivered",         sub: "Enjoy your purchase!",          Icon: CheckCircle2 },
 ];
@@ -30,7 +40,7 @@ const REFUND_PIPELINE: { key: string; label: string; sub: string; Icon: React.FC
   { key: "refund_requested", label: "Refund Requested", sub: "Waiting for admin review",   Icon: RotateCcw },
   { key: "refund_accepted",  label: "Refund Accepted",  sub: "Admin approved your refund", Icon: CheckCircle2 },
   { key: "refund_pickup",    label: "Picked Up",        sub: "Item collected",             Icon: Truck },
-  { key: "Refunded",         label: "Refunded",         sub: "Amount will be credited",    Icon: PayIcon },
+  { key: "Refunded",         label: "Refunded",         sub: "Amount will be credited",    Icon: CheckCircle2 },
 ];
 
 const fmt = (n: number) =>
@@ -54,7 +64,16 @@ const OrderDetailPage: React.FC = () => {
       .then(setOrder)
       .catch(() => navigate("/orders"))
       .finally(() => setLoading(false));
-  }, [id, navigate]);
+  }, [id]);
+
+  // Poll every 30s to reflect delivery partner updates in real time
+  useEffect(() => {
+    if (!id) return;
+    const poll = setInterval(() => {
+      getMyOrderById(id).then(setOrder).catch(() => {});
+    }, 30000);
+    return () => clearInterval(poll);
+  }, [id]);
 
   const handleCancel = async () => {
     if (!order) return;
@@ -278,7 +297,9 @@ const OrderDetailPage: React.FC = () => {
               Activity
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-              {[...timeline].reverse().map((event, idx) => {
+              {[...timeline].reverse()
+                .filter(event => event.status !== 'Paid')
+                .map((event, idx) => {
                 const es = STATUS_META[event.status] || STATUS_META.Pending;
                 const isFirst = idx === 0;
                 return (
@@ -311,7 +332,7 @@ const OrderDetailPage: React.FC = () => {
                     <div style={{ flex: 1, paddingTop: 2 }}>
                       <div className="d-flex align-items-center justify-content-between gap-2 flex-wrap">
                         <span style={{ fontWeight: 700, fontSize: '0.88rem', color: isFirst ? es.color : 'var(--text-secondary)' }}>
-                          {event.status}
+                          {STATUS_LABELS[event.status] || event.status}
                         </span>
                         <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
                           {fmtDate(event.timestamp)}

@@ -21,11 +21,27 @@ const OrderManagement: React.FC = () => {
 
   const PIPELINE_STEPS: OrderStatus[] = ['Pending', 'Processing', 'Shipped', 'Delivered'];
   const PIPELINE_LABELS: Record<string, string> = {
-    Pending: 'Order Placed', Processing: 'Picked Up', Shipped: 'Out for Delivery', Delivered: 'Delivered',
+    Pending:    'Order Placed',
+    Processing: 'Order Picked Up',
+    Shipped:    'Out for Delivery',
+    Delivered:  'Delivered',
+  };
+  const TIMELINE_LABELS: Record<string, string> = {
+    Pending:    'Order Placed',
+    Paid:       'Order Placed',
+    Processing: 'Order Picked Up',
+    Shipped:    'Out for Delivery',
+    Delivered:  'Delivered',
+    Cancelled:  'Cancelled',
+    Refunded:   'Refunded',
   };
   const DANGER_STEPS: OrderStatus[] = ['Cancelled', 'Refunded'];
 
-  const getStepIndex = (status: OrderStatus) => PIPELINE_STEPS.indexOf(status);
+  const getStepIndex = (status: OrderStatus) => {
+    // Treat Paid same as Pending (both mean order placed)
+    const normalized = status === 'Paid' ? 'Pending' : status;
+    return PIPELINE_STEPS.indexOf(normalized as OrderStatus);
+  };
 
   const isFinalized = (status: OrderStatus) =>
     ['Cancelled', 'Refunded', 'Delivered'].includes(status);
@@ -60,6 +76,19 @@ const OrderManagement: React.FC = () => {
       setIsLoading(false);
     }
   };
+
+  // Poll for updates when viewing order details (delivery partner may update status)
+  useEffect(() => {
+    if (view !== 'details' || !selectedOrder) return;
+    const id = setInterval(async () => {
+      try {
+        const updated = await getOrderById(selectedOrder._id);
+        setSelectedOrder(updated);
+        setNewStatus(updated.status);
+      } catch { /* silent */ }
+    }, 30000);
+    return () => clearInterval(id);
+  }, [view, selectedOrder?._id]);
 
   const handleStatusUpdate = async (targetStatus?: OrderStatus) => {
     const statusToApply = targetStatus || (newStatus as OrderStatus);
@@ -191,7 +220,7 @@ const OrderManagement: React.FC = () => {
                             background: getStatusBadgeClass(o.status).bg,
                             padding: '4px 12px', borderRadius: '20px',
                           }}>
-                            {o.status}
+                            {TIMELINE_LABELS[o.status] || o.status}
                           </span>
                           {o.refundStatus === 'pending_refund' && (
                             <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#d97706', background: 'rgba(245,158,11,0.1)', padding: '3px 8px', borderRadius: '20px', marginLeft: 4 }}>
@@ -252,7 +281,7 @@ const OrderManagement: React.FC = () => {
                       color: getStatusBadgeClass(selectedOrder.status).color,
                       background: getStatusBadgeClass(selectedOrder.status).bg,
                       padding: '5px 14px', borderRadius: '20px',
-                    }}>{selectedOrder.status}</span>
+                    }}>{TIMELINE_LABELS[selectedOrder.status] || selectedOrder.status}</span>
                   </div>
                   <p style={{ color: '#999', fontSize: '0.88rem', fontWeight: 500, margin: '4px 0 0' }}>
                     Placed on {formatDate(selectedOrder.createdAt)}
@@ -322,8 +351,7 @@ const OrderManagement: React.FC = () => {
                                     </div>
                                     <span style={{ fontSize: '0.58rem', fontWeight: 700, color: done ? '#10b981' : active ? 'var(--prime-orange)' : '#bbb', textAlign: 'center', maxWidth: 56, lineHeight: 1.3 }}>
                                       {PIPELINE_LABELS[step]}
-                                    </span>
-                                  </div>
+                                    </span>                                  </div>
                                   {idx < PIPELINE_STEPS.length - 1 && (
                                     <div style={{ flex: 1, height: 2, background: idx < curIdx ? '#10b981' : '#f0f0f2', margin: '0 4px', marginBottom: 22, transition: 'background 0.3s' }} />
                                   )}
@@ -378,16 +406,18 @@ const OrderManagement: React.FC = () => {
 
                     {/* Activity log */}
                     <div style={{ position: 'relative', paddingLeft: '20px', borderLeft: '2px solid #f0f0f2' }}>
-                      {selectedOrder.timeline.map((event, idx) => (
+                      {selectedOrder.timeline
+                        .filter(event => event.status !== 'Paid')
+                        .map((event, idx) => (
                         <div key={idx} style={{ position: 'relative', marginBottom: '20px', paddingLeft: '20px' }}>
                           <span style={{ position: 'absolute', left: '-27px', top: '2px', width: '14px', height: '14px', borderRadius: '50%', background: 'var(--prime-orange)', border: '2px solid #fff', display: 'block' }} />
                           <div style={{ fontWeight: 700, color: '#1a1a1a', fontSize: '0.9rem' }}>
-                            {PIPELINE_LABELS[event.status] || event.status}
+                            {TIMELINE_LABELS[event.status] || event.status}
                           </div>
                           <div style={{ fontSize: '0.75rem', color: '#bbb', fontWeight: 500, marginTop: '2px' }}>
                             {formatDate(event.timestamp)} · {formatTime(event.timestamp)}
                           </div>
-                          {event.note && <p style={{ color: '#999', fontSize: '0.8rem', fontStyle: 'italic', margin: '4px 0 0' }}>"{event.note}"</p>}
+                          {event.note && event.status !== 'Paid' && <p style={{ color: '#999', fontSize: '0.8rem', fontStyle: 'italic', margin: '4px 0 0' }}>"{event.note}"</p>}
                         </div>
                       ))}
                     </div>
@@ -415,20 +445,22 @@ const OrderManagement: React.FC = () => {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
                           {PIPELINE_STEPS.map((step, idx) => {
                             const currentIdx = getStepIndex(selectedOrder.status);
-                            const isDone = idx < currentIdx;
+                            const isDone    = idx < currentIdx;
                             const isCurrent = step === selectedOrder.status;
-                            const isNext = idx === currentIdx + 1;
-                            const isFuture = idx > currentIdx + 1;
+                            const isNext    = idx === currentIdx + 1;
+                            const isFuture  = idx > currentIdx + 1;
+                            // Processing and Shipped are set automatically by delivery partner
+                            const isAutoStep = step === 'Processing' || step === 'Shipped';
 
                             return (
                               <button
                                 key={step}
-                                disabled={isSaving || isCurrent || isDone || isFuture}
-                                onClick={() => isNext ? handleStatusUpdate(step) : undefined}
+                                disabled={isSaving || isCurrent || isDone || isFuture || isAutoStep}
+                                onClick={() => (isNext && !isAutoStep) ? handleStatusUpdate(step) : undefined}
                                 style={{
                                   display: 'flex', alignItems: 'center', gap: '10px',
                                   padding: '10px 14px', borderRadius: '10px', border: 'none',
-                                  cursor: isNext ? 'pointer' : 'default',
+                                  cursor: (isNext && !isAutoStep) ? 'pointer' : 'default',
                                   background: isCurrent
                                     ? 'var(--prime-orange)'
                                     : isDone
@@ -440,18 +472,11 @@ const OrderManagement: React.FC = () => {
                                   transition: 'all 0.2s',
                                 }}
                               >
-                                {/* Step indicator */}
                                 <span style={{
                                   width: '22px', height: '22px', borderRadius: '50%', flexShrink: 0,
                                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                                   fontSize: '0.65rem', fontWeight: 800,
-                                  background: isCurrent
-                                    ? 'rgba(255,255,255,0.3)'
-                                    : isDone
-                                      ? 'rgba(16,185,129,0.3)'
-                                      : isNext
-                                        ? 'rgba(255,255,255,0.2)'
-                                        : 'rgba(255,255,255,0.08)',
+                                  background: isCurrent ? 'rgba(255,255,255,0.3)' : isDone ? 'rgba(16,185,129,0.3)' : isNext ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.08)',
                                   color: isDone ? '#10b981' : '#fff',
                                 }}>
                                   {isDone ? '✓' : idx + 1}
@@ -468,7 +493,12 @@ const OrderManagement: React.FC = () => {
                                     CURRENT
                                   </span>
                                 )}
-                                {isNext && !isSaving && (
+                                {isAutoStep && !isDone && !isCurrent && (
+                                  <span style={{ fontSize: '0.6rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)', background: 'rgba(255,255,255,0.06)', padding: '2px 8px', borderRadius: '20px' }}>
+                                    AUTO
+                                  </span>
+                                )}
+                                {isNext && !isAutoStep && !isSaving && (
                                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                     <polyline points="9 18 15 12 9 6" />
                                   </svg>

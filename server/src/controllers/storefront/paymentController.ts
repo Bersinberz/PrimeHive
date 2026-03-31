@@ -3,9 +3,13 @@ import crypto from "crypto";
 import Razorpay from "razorpay";
 import Order from "../../models/Order";
 import User from "../../models/User";
+import Product from "../../models/Product";
+import Cart from "../../models/Cart";
+import Coupon from "../../models/Coupon";
 import Settings from "../../models/Settings";
 import { asyncHandler } from "../../utils/asyncHandler";
 import { sendCustomerOrderEmail } from "../../utils/sendCustomerOrderEmail";
+import { sendLowStockEmail } from "../../utils/sendLowStockEmail";
 
 // Lazy-initialize so keys are read at request time, not module load
 let _razorpay: Razorpay | null = null;
@@ -75,14 +79,43 @@ export const verifyPayment = asyncHandler(async (req: Request, res: Response) =>
     return res.status(400).json({ message: "Payment verification failed: invalid signature" });
   }
 
-  // Mark order as Paid
-  const order = await Order.findById(orderId);
+  // Mark order as Paid — then do all the work that was deferred from createOrder
+  const order = await Order.findById(orderId).populate("items.product", "createdBy");
   if (!order) return res.status(404).json({ message: "Order not found" });
+  if (order.status === "Cancelled") return res.status(400).json({ message: "Order was cancelled due to payment timeout." });
+  if (order.status === "Paid") return res.status(400).json({ message: "Order already paid." });
 
   order.status = "Paid";
   order.paymentMethod = "Razorpay";
   order.timeline.push({ status: "Paid", timestamp: new Date(), note: `Razorpay payment ${razorpay_payment_id}` });
   await order.save();
+
+  // NOW deduct stock (deferred from createOrder for Razorpay)
+  await Promise.allSettled(order.items.map(item =>
+    Product.findByIdAndUpdate(item.product, { $inc: { stock: -item.quantity } })
+  ));
+
+  // Mark coupon used if applicable
+  const pendingCouponId = (order as any).pendingCouponId;
+  if (pendingCouponId && order.customer) {
+    await Coupon.findByIdAndUpdate(pendingCouponId, {
+      $inc: { usageCount: 1 },
+      $push: { usedBy: order.customer },
+    }).catch(() => {});
+  }
+
+  // Clear cart
+  if (order.customer) {
+    await Cart.findOneAndUpdate({ user: order.customer }, { items: [] }).catch(() => {});
+  }
+
+  // Increment salesCount
+  order.items.forEach(item => Product.findByIdAndUpdate(item.product, { $inc: { salesCount: item.quantity } }).catch(() => {}));
+
+  // Low stock check
+  const productIds = order.items.map(i => i.product);
+  const updatedProducts = await Product.find({ _id: { $in: productIds } }).select("name stock createdBy").lean();
+  sendLowStockEmail(updatedProducts as any);
 
   // Send confirmation email now that payment is confirmed
   try {
@@ -128,6 +161,19 @@ export const verifyPayment = asyncHandler(async (req: Request, res: Response) =>
         createdAt:      order.createdAt,
       });
     }
+
+    // Notify staff now that payment is confirmed
+    const { sendOrderNotificationEmail } = await import("../../utils/sendOrderNotificationEmail");
+    const enrichedItems = order.items.map(i => ({
+      name: i.name, quantity: i.quantity, price: i.price, image: i.image,
+      createdBy: (i.product as any)?.createdBy,
+    }));
+    sendOrderNotificationEmail({ orderId: order.orderId, totalAmount: order.totalAmount, customerName, items: enrichedItems }).catch(() => {});
+
+    // Auto-assign delivery partner now that payment is confirmed
+    import("../../utils/autoAssignDelivery").then(({ autoAssignDelivery }) => {
+      autoAssignDelivery(order._id.toString());
+    }).catch(() => {});
   } catch { /* email failure must not break payment confirmation */ }
 
   res.status(200).json({
@@ -136,4 +182,28 @@ export const verifyPayment = asyncHandler(async (req: Request, res: Response) =>
     orderRef:  order.orderId,
     paymentId: razorpay_payment_id,
   });
+});
+
+/**
+ * POST /api/v1/payments/expire
+ * Called by frontend when 5-min payment timer runs out.
+ * Cancels the order and restores stock.
+ */
+export const expirePayment = asyncHandler(async (req: Request, res: Response) => {
+  const { orderId } = req.body;
+  if (!orderId) return res.status(400).json({ message: "orderId is required" });
+
+  const order = await Order.findById(orderId);
+  if (!order) return res.status(404).json({ message: "Order not found" });
+  if (order.status !== "Pending") {
+    return res.status(400).json({ message: "Order is no longer pending." });
+  }
+
+  order.status = "Cancelled";
+  order.timeline.push({ status: "Cancelled", timestamp: new Date(), note: "Payment timeout — not completed within 5 minutes" });
+  await order.save();
+
+  // Stock was NOT deducted for Razorpay draft orders, so no restore needed
+
+  res.status(200).json({ message: "Order cancelled due to payment timeout." });
 });

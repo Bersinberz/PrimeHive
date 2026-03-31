@@ -6,7 +6,7 @@ import { useCart } from "../../context/CartContext";
 import { useAuth } from "../../context/AuthContext";
 import { placeOrder } from "../../services/storefront/orderService";
 import type { ShippingAddress } from "../../services/storefront/orderService";
-import { createRazorpayOrder, verifyRazorpayPayment, loadRazorpayScript } from "../../services/storefront/paymentService";
+import { createRazorpayOrder, verifyRazorpayPayment, loadRazorpayScript, expirePayment } from "../../services/storefront/paymentService";
 import { validateCoupon } from "../../services/storefront/couponService";
 import type { CouponValidationResult } from "../../services/storefront/couponService";
 import { getAddresses } from "../../services/storefront/accountService";
@@ -162,7 +162,7 @@ const CheckoutPage: React.FC = () => {
         ...(appliedCoupon ? { couponId: appliedCoupon.couponId, couponDiscount: appliedCoupon.couponDiscount } : {}),
       });
 
-      // Step 2: If Razorpay, open payment modal
+      // Step 2: If Razorpay, open payment modal with 5-min timer
       if (paymentMethod === "Razorpay") {
         const loaded = await loadRazorpayScript();
         if (!loaded) {
@@ -173,7 +173,17 @@ const CheckoutPage: React.FC = () => {
 
         const rzpOrder = await createRazorpayOrder(result._id);
 
+        const TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+        let timedOut = false;
+
         await new Promise<void>((resolve, reject) => {
+          // Start 5-min countdown timer
+          const timer = setTimeout(async () => {
+            timedOut = true;
+            try { await expirePayment(result._id); } catch { /* best effort */ }
+            reject(new Error("Payment time expired (5 minutes). Your order has been cancelled. Please place a new order."));
+          }, TIMEOUT_MS);
+
           const options = {
             key:         rzpOrder.keyId,
             amount:      rzpOrder.amount,
@@ -188,6 +198,8 @@ const CheckoutPage: React.FC = () => {
             },
             theme: { color: "#ff8c42" },
             handler: async (response: any) => {
+              clearTimeout(timer);
+              if (timedOut) return;
               try {
                 await verifyRazorpayPayment({
                   razorpay_order_id:   response.razorpay_order_id,
@@ -201,7 +213,10 @@ const CheckoutPage: React.FC = () => {
               }
             },
             modal: {
-              ondismiss: () => reject(new Error("Payment cancelled. Your order is saved — complete payment from My Orders.")),
+              ondismiss: () => {
+                clearTimeout(timer);
+                if (!timedOut) reject(new Error("Payment cancelled. Your order is saved — complete payment from My Orders."));
+              },
             },
           };
 
@@ -210,9 +225,9 @@ const CheckoutPage: React.FC = () => {
         });
       }
 
-      // Step 3: Clear cart and navigate
-      await clearCart();
+      // Step 3: Navigate first, then clear cart
       navigate(`/order-confirmation/${result._id}`, { state: { order: result } });
+      clearCart();
     } catch (err: any) {
       setServerError(err?.message || err?.response?.data?.message || "Failed to place order. Please try again.");
     } finally {

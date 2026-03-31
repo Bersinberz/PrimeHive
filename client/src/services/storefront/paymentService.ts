@@ -37,3 +37,7 @@ export const loadRazorpayScript = (): Promise<boolean> =>
     script.onerror = () => resolve(false);
     document.body.appendChild(script);
   });
+
+export const expirePayment = async (orderId: string): Promise<void> => {
+  await axiosInstance.post("/payments/expire", { orderId });
+};
