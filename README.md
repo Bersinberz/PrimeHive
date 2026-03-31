@@ -12,148 +12,176 @@
 
 <br/>
 
-![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=white)
+![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
 ![Node.js](https://img.shields.io/badge/Node.js-Express-339933?style=for-the-badge&logo=node.js&logoColor=white)
 ![MongoDB](https://img.shields.io/badge/MongoDB-Mongoose-47A248?style=for-the-badge&logo=mongodb&logoColor=white)
-![Vite](https://img.shields.io/badge/Vite-5.x-646CFF?style=for-the-badge&logo=vite&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-7.x-646CFF?style=for-the-badge&logo=vite&logoColor=white)
 
 ![Razorpay](https://img.shields.io/badge/Razorpay-Payment_Gateway-02042B?style=for-the-badge&logo=razorpay&logoColor=white)
 ![Cloudinary](https://img.shields.io/badge/Cloudinary-Media_Storage-3448C5?style=for-the-badge&logo=cloudinary&logoColor=white)
 ![Redis](https://img.shields.io/badge/Redis-Cache-DC382D?style=for-the-badge&logo=redis&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 ![Sentry](https://img.shields.io/badge/Sentry-Monitoring-362D59?style=for-the-badge&logo=sentry&logoColor=white)
-![Framer](https://img.shields.io/badge/Framer_Motion-Animations-0055FF?style=for-the-badge&logo=framer&logoColor=white)
 
 </div>
 
 ---
 
-## ✨ What is PrimeHive?
+## What is PrimeHive?
 
-PrimeHive is a **multi-vendor e-commerce platform** built from the ground up with a focus on real-world production requirements. It supports the complete journey — from a customer browsing products and paying via **Razorpay** or COD, to a delivery partner completing a return pickup back to the seller's store.
+PrimeHive is a **full-stack e-commerce platform** built for real-world production use. It covers the complete journey — from a customer browsing products and paying via **Razorpay** or COD, to a delivery partner completing a return pickup back to the seller's store.
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 PrimeHive/
-├── client/                  # React + TypeScript + Vite
+├── client/                  # React 19 + TypeScript + Vite 7
 │   └── src/
 │       ├── components/      # Admin / Delivery / Storefront UI
 │       ├── pages/           # Admin / Delivery / User pages
 │       ├── services/        # Axios API layer
-│       ├── context/         # Auth, Cart, Settings, Toast
-│       └── hooks/           # Custom hooks
+│       ├── context/         # Auth, Cart, Settings, Theme, Toast
+│       └── hooks/           # Custom hooks (usePermission)
 │
-└── server/                  # Node.js + Express + TypeScript
-    └── src/
-        ├── controllers/     # Admin / Delivery / Storefront
-        ├── models/          # Mongoose schemas
-        ├── routes/          # Express routers
-        ├── middleware/       # Auth, permissions, validation
-        ├── utils/           # Email, auto-assign, helpers
-        └── jobs/            # Background jobs (purge, etc.)
+├── server/                  # Node.js + Express 5 + TypeScript
+│   └── src/
+│       ├── controllers/     # Admin / Delivery / Storefront
+│       ├── models/          # 14 Mongoose schemas
+│       ├── routes/          # Express routers (versioned /api/v1)
+│       ├── middleware/       # Auth, permissions, validation, audit
+│       ├── config/          # DB, Redis, Cloudinary, Mailer, Sentry
+│       ├── utils/           # Email templates, validators, helpers
+│       ├── schemas/         # Zod validation schemas
+│       ├── jobs/            # Background jobs (purge deleted users)
+│       └── types/           # TypeScript definitions
+│
+├── nginx/                   # Reverse proxy config (SSL, rate limiting)
+├── scripts/                 # deploy.sh, mongo-init.js
+├── docker-compose.yml       # Production orchestration
+├── docker-compose.dev.yml   # Development orchestration
+└── Makefile                 # Convenience commands
 ```
 
 ---
 
-## 👥 User Roles
+## User Roles
 
 | Role | Access |
 |------|--------|
-| 🛍️ **Customer** | Browse, cart, checkout (Razorpay / COD), orders, returns, wishlist |
+| 🛍️ **Customer** | Browse, cart, checkout (Razorpay / COD), orders, returns, wishlist, reviews |
 | 👑 **Super Admin** | Full platform control, staff management, analytics, audit log |
-| 🏪 **Staff (Seller)** | Products, categories, orders for their own store |
+| 🏪 **Staff (Seller)** | Products, categories, orders scoped to their own store |
 | 🔧 **Admin Staff** | Configurable module-level permissions |
 | 🚚 **Delivery Partner** | Delivery panel, earnings, return pickups |
 
 ---
 
-## 🚀 Features
+## Features
 
-### 🛍️ Storefront
+### Storefront
 - Product browsing with search, filters, and categories
 - Cart with coupon codes and real-time price calculation
-- Checkout with saved addresses or guest checkout
-- **Razorpay** payment gateway with 5-minute timeout — if payment is not completed, the order is automatically cancelled and stock is restored
+- Checkout with saved addresses
+- **Razorpay** payment gateway with 5-minute timeout — unpaid orders are auto-cancelled and stock is restored
 - Cash on Delivery (COD) support
-- Order tracking with live timeline (Order Placed → Picked Up → Out for Delivery → Delivered)
-- Refund requests with full return lifecycle
+- Order tracking with live timeline (Placed → Picked Up → Out for Delivery → Delivered)
+- Return requests with full return lifecycle
 - Wishlist, product reviews, and account management
 
-### 👑 Admin Panel
-- Dashboard with revenue charts, low stock alerts, and order stats
+### Admin Panel
+- Dashboard with revenue charts (Recharts), low stock alerts, and order stats
 - Product & category management with bulk CSV import/export
 - Order management with automatic delivery partner assignment
-- Customer, staff, and admin staff management with granular permissions
+- Customer, staff, and admin staff management with granular per-module permissions
 - Returns & refund approval — triggers return pickup assignment on approval
 - Offers, coupons, and review moderation
 - Audit log and advanced analytics
+- Store profile and settings management
 
-### 💳 Razorpay Integration
+### Razorpay Integration
 - Razorpay order created on checkout — **no stock deducted until payment is verified**
-- HMAC-SHA256 signature verification on every payment
+- HMAC-SHA256 signature verification on every payment callback
 - 5-minute frontend countdown timer — auto-cancels order on timeout
-- Customer confirmation email sent only after successful payment
-- Staff notification email sent only after successful payment
+- Confirmation emails sent only after successful payment verification
 - Delivery partner assigned only after successful payment
 
-### 🚚 Delivery Partner Panel
+### Delivery Partner Panel
 - Mobile-first interface with dark mode and online/offline toggle
 - Real-time order assignment with Accept / Reject
 - OTP-verified delivery confirmation (OTP sent to customer email)
 - Return pickup workflow: Accept → Pickup from Customer → Return to Seller Store
 - Earnings dashboard with full delivery history
-- Settings, support, report issue, and privacy policy
+- Settings, support, report issue, and privacy policy pages
 
-### 📧 Email System
-- Customer: order confirmation, status updates, delivery OTP, refund approval
+### Email System (Nodemailer)
+- Customer: order confirmation, status updates, delivery OTP, refund approval/rejection
 - Staff (Seller): new order notification routed per seller
-- Delivery partner: new order assignment notification
-- Refund approved/rejected emails to customer
+- Delivery partner: new assignment notification
 - Welcome emails with secure password setup links (24-hour expiry)
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 ### Frontend
 
 | Technology | Purpose |
 |-----------|---------|
-| React 18 + TypeScript | UI framework |
-| Vite 5 | Build tool |
+| React 19 + TypeScript | UI framework |
+| Vite 7 | Build tool |
+| React Router v7 | Client-side routing |
 | Framer Motion | Page & component animations |
-| Bootstrap 5 | Layout utilities |
-| Lucide React | Icon library |
+| Bootstrap 5 + Bootstrap Icons | Layout & icons |
+| Lucide React | Additional icon library |
+| Recharts | Dashboard charts |
 | Axios | HTTP client |
-| React Router v6 | Client-side routing |
+| React Avatar Editor | Profile image cropping |
+| Sentry (React) | Frontend error monitoring |
+| Vitest + Testing Library | Unit & component tests |
 
 ### Backend
 
 | Technology | Purpose |
 |-----------|---------|
-| Node.js + Express | Server framework |
+| Node.js + Express 5 | Server framework |
 | TypeScript | Type safety across the stack |
-| MongoDB + Mongoose | Primary database |
-| Redis | Session cache (optional) |
-| JWT + HTTP-only Cookies | Authentication |
+| MongoDB 7 + Mongoose | Primary database |
+| Redis 7 (ioredis) | Session cache |
+| JWT + HTTP-only Cookies | Authentication (access + refresh tokens) |
 | Nodemailer | Transactional email |
-| Cloudinary | Image & media storage |
-| **Razorpay** | Payment gateway |
-| Sentry | Error monitoring & tracing |
+| Cloudinary + Multer | Image & media storage |
+| Razorpay | Payment gateway |
+| Zod | Request validation schemas |
+| Winston + Morgan | Structured logging |
+| Helmet.js | Security headers |
+| express-rate-limit | Route-level rate limiting |
+| bcryptjs (12 rounds) | Password hashing |
+| Sentry (Node) | Backend error monitoring & tracing |
+| Vitest | Unit tests |
+
+### Infrastructure
+
+| Technology | Purpose |
+|-----------|---------|
+| Docker + Docker Compose | Container orchestration |
+| Nginx 1.25 | Reverse proxy, SSL termination, rate limiting |
+| MongoDB 7.0 | Database container |
+| Redis 7.2 Alpine | Cache container |
 
 ---
 
-## ⚡ Getting Started
+## Getting Started
 
 ### Prerequisites
 
 - Node.js 18+
 - MongoDB (local or Atlas)
-- Redis (optional)
+- Redis (optional but recommended)
 - Razorpay account (test keys work fine)
+- Cloudinary account
 
 ### 1. Clone
 
@@ -167,8 +195,8 @@ cd primehive
 ```bash
 cd server
 npm install
-cp .env.example .env.development
-# Fill in your environment variables (see below)
+cp .env.production.example .env.development
+# Fill in your environment variables
 npm run dev
 ```
 
@@ -183,14 +211,27 @@ npm run dev
 
 ---
 
-## 🔐 Environment Variables
+## Environment Variables
 
-### Server — `server/.env.development`
+### Root `.env` (Docker Compose)
+
+```env
+MONGO_ROOT_USER=primehive_admin
+MONGO_ROOT_PASS=change_this_strong_password
+REDIS_PASSWORD=change_this_redis_password
+VITE_API_URL=https://yourdomain.com/api/v1
+```
+
+### Server `server/.env.development`
 
 ```env
 PORT=5000
+NODE_ENV=development
 MONGODB_URI=mongodb://localhost:27017/primehive
-JWT_SECRET=your_jwt_secret_here
+JWT_SECRET=your_jwt_secret_min_64_chars
+JWT_EXPIRES_IN=15m
+REFRESH_TOKEN_SECRET=another_long_random_secret
+REFRESH_TOKEN_EXPIRES_IN=7d
 CLIENT_URL=http://localhost:5173
 
 # Email (SMTP)
@@ -212,10 +253,10 @@ RAZORPAY_KEY_SECRET=your_razorpay_secret
 REDIS_URL=redis://localhost:6379
 
 # Sentry (optional)
-SENTRY_DSN=https://your_sentry_dsn
+SENTRY_DSN=https://your_sentry_dsn@sentry.io/project_id
 ```
 
-### Client — `client/.env`
+### Client `client/.env`
 
 ```env
 VITE_API_URL=http://localhost:5000/api/v1
@@ -223,7 +264,32 @@ VITE_API_URL=http://localhost:5000/api/v1
 
 ---
 
-## 📦 Order Lifecycle
+## Docker (Production)
+
+```bash
+# Configure environment
+cp .env.example .env
+cp server/.env.production.example server/.env.production
+# Edit both files with your values
+
+# Deploy
+make deploy
+# or
+bash scripts/deploy.sh
+
+# Useful commands
+make status        # Show running containers
+make health        # Check API health
+make logs          # Tail all logs
+make db-backup     # Backup MongoDB
+make rollback      # Rollback to previous version
+```
+
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for the full production deployment guide including SSL setup with Let's Encrypt.
+
+---
+
+## Order Lifecycle
 
 ```
 Customer Places Order
@@ -232,7 +298,7 @@ Customer Places Order
         │                                                              │
         └── Razorpay ──► 5-min timer ──► Payment verified             │
                               │                                        │
-                         Timeout? ──► Order Cancelled                  │
+                         Timeout? ──► Order Cancelled + Stock Restored │
                                                                        ▼
                                                               Stock deducted
                                                               Cart cleared
@@ -247,7 +313,7 @@ Customer Places Order
                                                                        │
                                                          OTP Verified ──► [Delivered]
                                                                        │
-                                                         Customer requests refund?
+                                                         Customer requests return?
                                                                        │
                                                          Admin approves ──► Email to customer
                                                                        │
@@ -260,32 +326,41 @@ Customer Places Order
 
 ---
 
-## 🔒 Security
+## Security
 
-- JWT access tokens + HTTP-only refresh token cookies
-- Rate limiting on all route groups (auth, admin, storefront)
+- JWT access tokens (15m) + HTTP-only refresh token cookies (7d)
+- Rate limiting on all route groups (auth: 10r/m, api: 30r/m via Nginx)
 - NoSQL injection sanitization on `req.body` and `req.query`
-- **Razorpay HMAC-SHA256 signature verification** on every payment
+- Razorpay HMAC-SHA256 signature verification on every payment
 - Role-based access control with granular per-module permissions
 - Password hashing with bcrypt (12 rounds)
 - Helmet.js security headers on all responses
+- Zod schema validation on all incoming requests
 
 ---
 
-## 📡 API Overview
+## API Overview
 
-| Base Path | Description |
-|-----------|-------------|
-| `POST /api/v1/auth/login` | Login (all roles) |
-| `GET /api/v1/products` | Public product catalog |
-| `POST /api/v1/orders` | Place order (COD or Razorpay draft) |
-| `POST /api/v1/payments/create-order` | Create Razorpay order |
-| `POST /api/v1/payments/verify` | Verify Razorpay payment |
-| `POST /api/v1/payments/expire` | Cancel timed-out Razorpay order |
-| `GET /api/v1/admin/orders` | Admin order management |
-| `GET /api/v1/delivery/orders` | Delivery partner orders |
-| `GET /api/v1/delivery/returns` | Delivery partner return pickups |
-| `GET /api/v1/delivery/earnings` | Delivery partner earnings |
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/v1/auth/login` | Login (all roles) |
+| `GET` | `/api/v1/products` | Public product catalog |
+| `POST` | `/api/v1/orders` | Place order (COD or Razorpay draft) |
+| `POST` | `/api/v1/payments/create-order` | Create Razorpay order |
+| `POST` | `/api/v1/payments/verify` | Verify Razorpay payment |
+| `POST` | `/api/v1/payments/expire` | Cancel timed-out Razorpay order |
+| `GET` | `/api/v1/admin/orders` | Admin order management |
+| `GET` | `/api/v1/admin/stats` | Dashboard analytics |
+| `GET` | `/api/v1/delivery/orders` | Delivery partner orders |
+| `GET` | `/api/v1/delivery/returns` | Delivery partner return pickups |
+| `GET` | `/api/v1/delivery/earnings` | Delivery partner earnings |
+| `GET` | `/api/v1/health` | Health check |
+
+---
+
+## Database Models
+
+User · Product · Category · Order · Cart · Address · Return · Review · Coupon · Offer · Wishlist · AuditLog · Settings · Counter
 
 ---
 
