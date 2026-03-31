@@ -118,7 +118,7 @@ function App() {
                       <Route path="products"        element={<ProtectedRoute permission="products">   <ProductManagement />   </ProtectedRoute>} />
                       <Route path="categories"      element={<ProtectedRoute permission="categories"> <CategoryManagement />  </ProtectedRoute>} />
                       <Route path="orders"          element={<ProtectedRoute permission="orders">     <OrderManagement />     </ProtectedRoute>} />
-                      <Route path="customers"       element={<ProtectedRoute allowedRoles={["superadmin", "admin_staff"]}><CustomerManagement /></ProtectedRoute>} />
+                      <Route path="customers"       element={<ProtectedRoute allowedRoles={["superadmin", "admin_staff", "staff"]} permission="customers"><CustomerManagement /></ProtectedRoute>} />
                       <Route path="staff"           element={<ProtectedRoute allowedRoles={["superadmin", "admin_staff"]}><StaffManagement /></ProtectedRoute>} />
                       <Route path="settings"        element={<ProtectedRoute allowedRoles={["superadmin"]}><Settings /></ProtectedRoute>} />
                       <Route path="profile"         element={<ProtectedRoute><MyProfile /></ProtectedRoute>} />
@@ -126,12 +126,12 @@ function App() {
                       <Route path="account-settings" element={<ProtectedRoute allowedRoles={["staff"]}><StaffSettings /></ProtectedRoute>} />
                       <Route path="offers"          element={<ProtectedRoute allowedRoles={["superadmin", "admin_staff"]}><OffersManagement /></ProtectedRoute>} />
                       <Route path="reviews"         element={<ProtectedRoute allowedRoles={["superadmin", "admin_staff"]}><ReviewManagement /></ProtectedRoute>} />
-                      <Route path="returns"         element={<ProtectedRoute allowedRoles={["superadmin", "admin_staff"]} permission="orders"><ReturnManagement /></ProtectedRoute>} />
+                      <Route path="returns"         element={<ProtectedRoute allowedRoles={["superadmin", "admin_staff", "staff"]} permission="orders"><ReturnManagement /></ProtectedRoute>} />
                       <Route path="audit-log"       element={<ProtectedRoute allowedRoles={["superadmin"]}><AuditLogPage /></ProtectedRoute>} />
                       <Route path="analytics"       element={<ProtectedRoute allowedRoles={["superadmin"]}><AdvancedAnalytics /></ProtectedRoute>} />
                       <Route path="bulk-products"   element={<ProtectedRoute permission="products"><BulkProducts /></ProtectedRoute>} />
                       <Route path="admin-staff"     element={<ProtectedRoute allowedRoles={["superadmin"]}><AdminStaffMgmt /></ProtectedRoute>} />
-                      <Route path="delivery-partners" element={<ProtectedRoute allowedRoles={["superadmin"]}><DeliveryPartnerMgmt /></ProtectedRoute>} />
+                      <Route path="delivery-partners" element={<ProtectedRoute allowedRoles={["superadmin", "admin_staff"]}><DeliveryPartnerMgmt /></ProtectedRoute>} />
                     </Route>
 
                     {/* Delivery Panel */}

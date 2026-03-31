@@ -66,7 +66,7 @@ export const addDeliveryPartner = asyncHandler(async (req: Request, res: Respons
 });
 
 export const updateDeliveryPartner = asyncHandler(async (req: Request, res: Response) => {
-  const { name, email, phone, vehicleType, vehicleNumber, status } = req.body;
+  const { name, email, phone, vehicleType, vehicleNumber, status, dateOfBirth, gender, password } = req.body;
   const update: Record<string, unknown> = {};
 
   if (name)          update.name          = name.trim();
@@ -74,7 +74,16 @@ export const updateDeliveryPartner = asyncHandler(async (req: Request, res: Resp
   if (phone)         update.phone         = normalizePhone(phone);
   if (vehicleType)   update.vehicleType   = vehicleType.trim();
   if (vehicleNumber) update.vehicleNumber = vehicleNumber.trim();
+  if (dateOfBirth)   update.dateOfBirth   = new Date(dateOfBirth);
+  if (gender)        update.gender        = gender;
   if (status && ["active", "inactive"].includes(status)) update.status = status;
+  if ((req as any).file?.path) update.profilePicture = (req as any).file.path;
+
+  // Handle password change
+  if (password && typeof password === "string") {
+    const user = await User.findOne({ _id: req.params.id, role: "delivery_partner" }).select("+password");
+    if (user) { user.password = password; await user.save(); }
+  }
 
   const user = await User.findOneAndUpdate(
     { _id: req.params.id, role: "delivery_partner" },
@@ -112,7 +121,7 @@ export const assignDeliveryPartner = asyncHandler(async (req: Request, res: Resp
 
   const order = await Order.findByIdAndUpdate(
     req.params.id,
-    { deliveryPartnerId, deliveryStatus: "assigned" },
+    { deliveryPartnerId, deliveryStatus: "assigned", assignedAt: new Date() },
     { returnDocument: "after" }
   ).populate("customer", "name email phone").populate("deliveryPartnerId", "name phone");
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import type { Staff } from '../../../services/admin/staffService';
+import type { Staff } from '../../../services/Admin/staffService';
 import DeletionCountdown from '../DeletionCountdown';
 
 type StaffStatus = 'active' | 'inactive' | 'deleted';

@@ -8,6 +8,7 @@ export interface IAdminStaffPermissions {
   offers:    { view: boolean; create: boolean; edit: boolean; delete: boolean };
   reviews:   { view: boolean; moderate: boolean; delete: boolean };
   returns:   { view: boolean; process: boolean };
+  delivery:  { view: boolean; create: boolean; edit: boolean; delete: boolean };
 }
 
 export const DEFAULT_ADMIN_STAFF_PERMISSIONS: IAdminStaffPermissions = {
@@ -17,6 +18,7 @@ export const DEFAULT_ADMIN_STAFF_PERMISSIONS: IAdminStaffPermissions = {
   offers:    { view: true, create: false, edit: false, delete: false },
   reviews:   { view: true, moderate: false, delete: false },
   returns:   { view: true, process: false },
+  delivery:  { view: false, create: false, edit: false, delete: false },
 };
 
 export interface IPermissions {
@@ -69,6 +71,7 @@ export interface IUser extends Document {
   // Delivery partner profile
   vehicleType?: string;
   vehicleNumber?: string;
+  isOnline?: boolean;
   // Notification preferences
   notificationPreferences?: {
     orderPlaced: boolean;
@@ -176,6 +179,7 @@ const userSchema = new mongoose.Schema<IUser>(
     // Delivery partner profile
     vehicleType:   { type: String, trim: true, maxlength: 50 },
     vehicleNumber: { type: String, trim: true, maxlength: 20 },
+    isOnline:      { type: Boolean, default: false }, // delivery partner availability
     // Notification preferences (staff)
     notificationPreferences: {
       orderPlaced: { type: Boolean, default: true },

@@ -221,6 +221,11 @@ export const createOrder = async (req: Request, res: Response) => {
       .lean();
     sendLowStockEmail(updatedProducts as any);
 
+    // Auto-assign a delivery partner (fire-and-forget)
+    import("../../utils/autoAssignDelivery").then(({ autoAssignDelivery }) => {
+      autoAssignDelivery(order._id.toString());
+    }).catch(() => {});
+
     res.status(201).json({
       orderId: order.orderId,
       _id: order._id,

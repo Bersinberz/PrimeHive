@@ -1,53 +1,113 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
-import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Phone, MapPin, Package, Camera, CheckCircle2 } from 'lucide-react';
-import { getDeliveryOrderById, updateDeliveryStatus, uploadProof, type DeliveryOrder } from '../../services/delivery/deliveryService';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
+import { ArrowLeft, Phone, MapPin, Package, Camera, CheckCircle2, Clock, IndianRupee, ShieldCheck } from 'lucide-react';
+import {
+  getDeliveryOrderById, updateDeliveryStatus, uploadProof,
+  sendDeliveryOtp, verifyDeliveryOtp, type DeliveryOrder,
+} from '../../services/delivery/deliveryService';
 import { useToast } from '../../context/ToastContext';
-import PrimeLoader from '../../components/PrimeLoader';
+import { OrderDetailSkeleton, SHIMMER_CSS } from '../../components/Delivery/DeliverySkeleton';
 
-const STATUS_FLOW: Record<string, { next: string; label: string; color: string }> = {
-  assigned:         { next: 'picked_up',        label: 'Mark as Picked Up',       color: '#d97706' },
-  picked_up:        { next: 'out_for_delivery',  label: 'Out for Delivery',         color: '#7c3aed' },
-  out_for_delivery: { next: 'delivered',         label: 'Mark as Delivered',        color: '#059669' },
+type Ctx = { dark: boolean; surface: string; text: string; muted: string; border: string };
+
+const STATUS_FLOW: Record<string, { next: string; label: string }> = {
+  picked_up:        { next: 'out_for_delivery', label: 'Start Delivery' },
+  out_for_delivery: { next: 'delivered',        label: 'Mark as Delivered' },
 };
 
-const STATUS_STYLE: Record<string, { color: string; bg: string }> = {
-  assigned:         { color: '#2563eb', bg: 'rgba(37,99,235,0.1)' },
-  picked_up:        { color: '#d97706', bg: 'rgba(245,158,11,0.1)' },
-  out_for_delivery: { color: '#7c3aed', bg: 'rgba(124,58,237,0.1)' },
-  delivered:        { color: '#059669', bg: 'rgba(16,185,129,0.1)' },
+const STATUS_META: Record<string, { color: string; bg: string; label: string }> = {
+  assigned:         { color: '#2563eb', bg: 'rgba(37,99,235,0.1)',  label: 'Assigned' },
+  picked_up:        { color: '#d97706', bg: 'rgba(245,158,11,0.1)', label: 'Picked Up' },
+  out_for_delivery: { color: '#7c3aed', bg: 'rgba(124,58,237,0.1)', label: 'Out for Delivery' },
+  delivered:        { color: '#059669', bg: 'rgba(16,185,129,0.1)', label: 'Delivered' },
 };
 
-const fmt = (n: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
+const TIMELINE_STEPS = ['assigned', 'picked_up', 'out_for_delivery', 'delivered'];
+const TIMELINE_LABELS: Record<string, string> = {
+  assigned: 'Order Placed', picked_up: 'Picked Up', out_for_delivery: 'Out for Delivery', delivered: 'Delivered',
+};
+
+const fmt = (n: number) =>
+  new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
+
+const isCOD = (method: string) =>
+  method?.toLowerCase().includes('cod') || method?.toLowerCase().includes('cash');
 
 const DeliveryOrderDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { showToast } = useToast();
-  const [order, setOrder] = useState<DeliveryOrder | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [updating, setUpdating] = useState(false);
+  const ctx = useOutletContext<Ctx>();
+  const { dark, surface, text, muted, border } = ctx || {};
+
+  const [order, setOrder]         = useState<DeliveryOrder | null>(null);
+  const [loading, setLoading]     = useState(true);
+  const [updating, setUpdating]   = useState(false);
   const [uploading, setUploading] = useState(false);
+
+  // OTP state
+  const [otpStep, setOtpStep]     = useState<'idle' | 'sending' | 'sent' | 'verifying' | 'verified'>('idle');
+  const [otpValue, setOtpValue]   = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!id) return;
-    getDeliveryOrderById(id).then(setOrder).catch(() => navigate('/delivery/orders')).finally(() => setLoading(false));
+    getDeliveryOrderById(id)
+      .then(o => {
+        setOrder(o);
+        if (o.deliveryOtpVerified) setOtpStep('verified');
+      })
+      .catch(() => navigate('/delivery/orders'))
+      .finally(() => setLoading(false));
   }, [id]);
 
   const handleStatusUpdate = async () => {
     if (!order) return;
     const flow = STATUS_FLOW[order.deliveryStatus];
     if (!flow) return;
+
+    // Require OTP verification before marking delivered
+    if (flow.next === 'delivered' && otpStep !== 'verified') {
+      showToast({ type: 'error', title: 'OTP Required', message: 'Please verify the delivery OTP first.' });
+      return;
+    }
+
     setUpdating(true);
     try {
       await updateDeliveryStatus(order._id, flow.next);
-      setOrder(prev => prev ? { ...prev, deliveryStatus: flow.next as any, status: flow.next === 'delivered' ? 'Delivered' : prev.status } : prev);
-      showToast({ type: 'success', title: 'Updated', message: `Status: ${flow.next.replace(/_/g, ' ')}` });
-    } catch {
-      showToast({ type: 'error', title: 'Error', message: 'Failed to update status.' });
+      setOrder(prev => prev ? { ...prev, deliveryStatus: flow.next as any } : prev);
+      showToast({ type: 'success', title: 'Status updated', message: TIMELINE_LABELS[flow.next] });
+    } catch (e: any) {
+      showToast({ type: 'error', title: 'Error', message: e?.response?.data?.message || 'Failed to update status.' });
     } finally { setUpdating(false); }
+  };
+
+  const handleSendOtp = async () => {
+    if (!order) return;
+    setOtpStep('sending');
+    try {
+      await sendDeliveryOtp(order._id);
+      setOtpStep('sent');
+      showToast({ type: 'success', title: 'OTP sent', message: 'OTP sent to customer email.' });
+    } catch {
+      setOtpStep('idle');
+      showToast({ type: 'error', title: 'Error', message: 'Failed to send OTP.' });
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!order || !otpValue) return;
+    setOtpStep('verifying');
+    try {
+      await verifyDeliveryOtp(order._id, otpValue);
+      setOtpStep('verified');
+      setOrder(prev => prev ? { ...prev, deliveryOtpVerified: true } : prev);
+      showToast({ type: 'success', title: 'OTP verified', message: 'You can now mark as delivered.' });
+    } catch (e: any) {
+      setOtpStep('sent');
+      showToast({ type: 'error', title: 'Invalid OTP', message: e?.response?.data?.message || 'Incorrect OTP.' });
+    }
   };
 
   const handleProofUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -63,99 +123,232 @@ const DeliveryOrderDetail: React.FC = () => {
     } finally { setUploading(false); e.target.value = ''; }
   };
 
-  if (loading) return <PrimeLoader isLoading />;
-  if (!order) return null;
+  if (loading) return (
+    <>
+      <style>{SHIMMER_CSS}</style>
+      <OrderDetailSkeleton dark={dark} surface={surface} border={border} />
+    </>
+  );
+  if (!order)  return null;
 
-  const ds = STATUS_STYLE[order.deliveryStatus] || { color: '#aaa', bg: '#f5f5f5' };
-  const flow = STATUS_FLOW[order.deliveryStatus];
-  const addr = order.shippingAddress;
+  const ds      = STATUS_META[order.deliveryStatus] || { color: '#aaa', bg: '#f5f5f5', label: order.deliveryStatus };
+  const flow    = STATUS_FLOW[order.deliveryStatus];
+  const addr    = order.shippingAddress;
+  const cod     = isCOD(order.paymentMethod);
+  const mapsUrl = `https://maps.google.com/?q=${encodeURIComponent([addr?.line1, addr?.city, addr?.state, addr?.zip].filter(Boolean).join(', '))}`;
+  const curStep = TIMELINE_STEPS.indexOf(order.deliveryStatus);
+
+  const Card: React.FC<{ children: React.ReactNode; style?: React.CSSProperties }> = ({ children, style }) => (
+    <div style={{ background: surface, borderRadius: 16, border: `1px solid ${border}`, padding: '16px', marginBottom: 12, ...style }}>
+      {children}
+    </div>
+  );
+
+  const SLabel: React.FC<{ label: string }> = ({ label }) => (
+    <p style={{ margin: '0 0 10px', fontSize: '0.62rem', fontWeight: 800, color: muted, textTransform: 'uppercase', letterSpacing: '1px' }}>{label}</p>
+  );
 
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-      <PrimeLoader isLoading={updating || uploading} />
+      <style>{SHIMMER_CSS}</style>
 
       <button onClick={() => navigate('/delivery/orders')}
-        style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: '#888', fontWeight: 700, fontSize: '0.85rem', marginBottom: 16, padding: 0 }}>
-        <ArrowLeft size={16} /> My Deliveries
+        style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: muted, fontWeight: 700, fontSize: '0.82rem', marginBottom: 14, padding: 0 }}>
+        <ArrowLeft size={15} /> My Deliveries
       </button>
 
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 900, color: '#1a1a1a', letterSpacing: '-0.5px' }}>{order.orderId}</h2>
-          <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: '#aaa' }}>{new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+            <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: text, letterSpacing: '-0.5px' }}>{order.orderId}</h2>
+            <span style={{ fontSize: '0.62rem', fontWeight: 800, padding: '2px 8px', borderRadius: 20, background: cod ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)', color: cod ? '#dc2626' : '#059669' }}>
+              {cod ? '💵 COD' : '✅ Paid'}
+            </span>
+          </div>
+          <p style={{ margin: 0, fontSize: '0.72rem', color: muted }}>
+            {new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+          </p>
         </div>
-        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: ds.color, background: ds.bg, padding: '4px 12px', borderRadius: 20, textTransform: 'capitalize' }}>
-          {order.deliveryStatus.replace(/_/g, ' ')}
+        <span style={{ fontSize: '0.68rem', fontWeight: 700, color: ds.color, background: ds.bg, padding: '4px 11px', borderRadius: 20, whiteSpace: 'nowrap' }}>
+          {ds.label}
         </span>
       </div>
 
+      {/* ── DELIVERY TIMELINE ── */}
+      <Card>
+        <SLabel label="Delivery Progress" />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
+          {TIMELINE_STEPS.map((step, idx) => {
+            const done   = idx <= curStep;
+            const active = idx === curStep;
+            return (
+              <React.Fragment key={step}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: idx < TIMELINE_STEPS.length - 1 ? 'none' : 1 }}>
+                  <div style={{
+                    width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: done ? (active ? 'var(--prime-gradient)' : '#10b981') : (dark ? 'rgba(255,255,255,0.08)' : '#f0f0f2'),
+                    border: active ? '2px solid #ff8c42' : 'none',
+                    transition: 'all 0.3s',
+                  }}>
+                    {done && !active
+                      ? <CheckCircle2 size={14} color="#fff" />
+                      : <div style={{ width: 8, height: 8, borderRadius: '50%', background: active ? '#fff' : (dark ? 'rgba(255,255,255,0.2)' : '#ccc') }} />
+                    }
+                  </div>
+                  <span style={{ fontSize: '0.55rem', fontWeight: 700, color: done ? (active ? '#ff8c42' : '#10b981') : muted, marginTop: 4, textAlign: 'center', maxWidth: 52 }}>
+                    {TIMELINE_LABELS[step]}
+                  </span>
+                </div>
+                {idx < TIMELINE_STEPS.length - 1 && (
+                  <div style={{ flex: 1, height: 2, background: idx < curStep ? '#10b981' : (dark ? 'rgba(255,255,255,0.08)' : '#f0f0f2'), margin: '0 2px', marginBottom: 18, transition: 'background 0.3s' }} />
+                )}
+              </React.Fragment>
+            );
+          })}
+        </div>
+      </Card>
+
       {/* Customer */}
-      <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #f0f0f2', padding: '16px', marginBottom: 12 }}>
-        <p style={{ margin: '0 0 12px', fontSize: '0.68rem', fontWeight: 800, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.8px' }}>Customer</p>
-        <p style={{ margin: '0 0 6px', fontWeight: 800, fontSize: '0.95rem', color: '#1a1a1a' }}>{order.customer?.name}</p>
-        <a href={`tel:${order.customer?.phone}`}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 50, background: 'rgba(37,99,235,0.08)', color: '#2563eb', fontWeight: 700, fontSize: '0.82rem', textDecoration: 'none' }}>
-          <Phone size={13} /> {order.customer?.phone}
-        </a>
-      </div>
+      <Card>
+        <SLabel label="Customer" />
+        <p style={{ margin: '0 0 10px', fontWeight: 800, fontSize: '0.95rem', color: text }}>{order.customer?.name}</p>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <a href={`tel:${order.customer?.phone}`}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 50, background: 'rgba(37,99,235,0.08)', color: '#2563eb', fontWeight: 700, fontSize: '0.78rem', textDecoration: 'none' }}>
+            <Phone size={13} /> {order.customer?.phone}
+          </a>
+          <a href={`https://wa.me/${order.customer?.phone?.replace(/\D/g, '')}`} target="_blank" rel="noreferrer"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 50, background: 'rgba(37,211,102,0.1)', color: '#25d366', fontWeight: 700, fontSize: '0.78rem', textDecoration: 'none' }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+            WhatsApp
+          </a>
+        </div>
+      </Card>
 
       {/* Address */}
-      <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #f0f0f2', padding: '16px', marginBottom: 12 }}>
-        <p style={{ margin: '0 0 10px', fontSize: '0.68rem', fontWeight: 800, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.8px' }}>Deliver To</p>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <MapPin size={16} color="var(--prime-orange)" style={{ flexShrink: 0, marginTop: 2 }} />
-          <p style={{ margin: 0, fontSize: '0.88rem', color: '#444', lineHeight: 1.7 }}>
+      <Card>
+        <SLabel label="Deliver To" />
+        <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
+          <MapPin size={14} color="#ff8c42" style={{ flexShrink: 0, marginTop: 2 }} />
+          <p style={{ margin: 0, fontSize: '0.85rem', color: text, lineHeight: 1.7 }}>
             {[addr?.line1, addr?.line2, addr?.city, addr?.state, addr?.zip].filter(Boolean).join(', ')}
           </p>
         </div>
-        <a href={`https://maps.google.com/?q=${encodeURIComponent([addr?.line1, addr?.city, addr?.state, addr?.zip].filter(Boolean).join(', '))}`}
-          target="_blank" rel="noreferrer"
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 10, padding: '8px 16px', borderRadius: 50, background: 'rgba(16,185,129,0.08)', color: '#059669', fontWeight: 700, fontSize: '0.82rem', textDecoration: 'none' }}>
-          Open in Maps
+        <a href={mapsUrl} target="_blank" rel="noreferrer"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 50, background: 'rgba(16,185,129,0.08)', color: '#059669', fontWeight: 700, fontSize: '0.78rem', textDecoration: 'none' }}>
+          <MapPin size={13} /> Open in Maps
         </a>
-      </div>
+      </Card>
+
+      {/* Payment */}
+      <Card>
+        <SLabel label="Payment" />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: cod ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <IndianRupee size={16} color={cod ? '#dc2626' : '#059669'} />
+            </div>
+            <div>
+              <p style={{ margin: 0, fontWeight: 800, fontSize: '0.88rem', color: text }}>{cod ? 'Cash on Delivery' : 'Online Payment'}</p>
+              <p style={{ margin: 0, fontSize: '0.72rem', color: muted }}>{cod ? 'Collect cash from customer' : 'Already paid online'}</p>
+            </div>
+          </div>
+          <span style={{ fontWeight: 900, fontSize: '1rem', color: text }}>{fmt(order.totalAmount)}</span>
+        </div>
+      </Card>
 
       {/* Items */}
-      <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #f0f0f2', padding: '16px', marginBottom: 12 }}>
-        <p style={{ margin: '0 0 12px', fontSize: '0.68rem', fontWeight: 800, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.8px' }}>Items ({order.items.length})</p>
+      <Card>
+        <SLabel label={`Items (${order.items.length})`} />
         {order.items.map((item, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, paddingBottom: i < order.items.length - 1 ? 10 : 0, marginBottom: i < order.items.length - 1 ? 10 : 0, borderBottom: i < order.items.length - 1 ? '1px solid #f5f5f7' : 'none' }}>
-            {item.image && <img src={item.image} alt={item.name} style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />}
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, paddingBottom: i < order.items.length - 1 ? 10 : 0, marginBottom: i < order.items.length - 1 ? 10 : 0, borderBottom: i < order.items.length - 1 ? `1px solid ${border}` : 'none' }}>
+            {item.image && <img src={item.image} alt={item.name} style={{ width: 42, height: 42, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />}
             <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ margin: 0, fontWeight: 700, fontSize: '0.85rem', color: '#1a1a1a' }}>{item.name}</p>
-              <p style={{ margin: 0, fontSize: '0.75rem', color: '#aaa' }}>Qty: {item.quantity} · {fmt(item.price)}</p>
+              <p style={{ margin: 0, fontWeight: 700, fontSize: '0.85rem', color: text }}>{item.name}</p>
+              <p style={{ margin: 0, fontSize: '0.72rem', color: muted }}>Qty: {item.quantity} · {fmt(item.price)}</p>
             </div>
           </div>
         ))}
-        <div style={{ borderTop: '1px solid #f0f0f2', marginTop: 12, paddingTop: 10, display: 'flex', justifyContent: 'space-between' }}>
-          <span style={{ fontWeight: 700, color: '#aaa', fontSize: '0.85rem' }}>Total</span>
-          <span style={{ fontWeight: 900, fontSize: '1rem', color: '#1a1a1a' }}>{fmt(order.totalAmount)}</span>
+        <div style={{ borderTop: `1px solid ${border}`, marginTop: 10, paddingTop: 10, display: 'flex', justifyContent: 'space-between' }}>
+          <span style={{ fontWeight: 700, color: muted, fontSize: '0.82rem' }}>Total</span>
+          <span style={{ fontWeight: 900, fontSize: '1rem', color: text }}>{fmt(order.totalAmount)}</span>
         </div>
-      </div>
+      </Card>
+
+      {/* ── OTP VERIFICATION (only for out_for_delivery) ── */}
+      {order.deliveryStatus === 'out_for_delivery' && (
+        <Card style={{ border: otpStep === 'verified' ? '1.5px solid rgba(16,185,129,0.4)' : `1px solid ${border}` }}>
+          <SLabel label="Delivery OTP Verification" />
+          {otpStep === 'verified' || order.deliveryOtpVerified ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: 'rgba(16,185,129,0.08)', borderRadius: 12 }}>
+              <ShieldCheck size={20} color="#059669" />
+              <div>
+                <p style={{ margin: 0, fontWeight: 800, fontSize: '0.88rem', color: '#059669' }}>OTP Verified</p>
+                <p style={{ margin: 0, fontSize: '0.72rem', color: muted }}>Customer confirmed delivery</p>
+              </div>
+            </div>
+          ) : (
+            <>
+              <p style={{ margin: '0 0 12px', fontSize: '0.8rem', color: muted, lineHeight: 1.6 }}>
+                Send a 6-digit OTP to the customer's email. Ask them to share it with you to confirm delivery.
+              </p>
+              {otpStep === 'idle' && (
+                <button onClick={handleSendOtp}
+                  style={{ width: '100%', padding: '12px', borderRadius: 12, border: 'none', background: 'var(--prime-gradient)', color: '#fff', fontWeight: 700, fontSize: '0.88rem', cursor: 'pointer' }}>
+                  Send OTP to Customer
+                </button>
+              )}
+              {otpStep === 'sending' && (
+                <div style={{ textAlign: 'center', padding: '12px', color: muted, fontSize: '0.85rem' }}>Sending OTP...</div>
+              )}
+              {(otpStep === 'sent' || otpStep === 'verifying') && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <p style={{ margin: 0, fontSize: '0.78rem', color: '#059669', fontWeight: 600 }}>✓ OTP sent to customer email</p>
+                  <input
+                    value={otpValue} onChange={e => setOtpValue(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="Enter 6-digit OTP"
+                    inputMode="numeric"
+                    style={{ width: '100%', padding: '12px 16px', borderRadius: 12, border: `1.5px solid ${border}`, background: surface, fontSize: '1.2rem', color: text, outline: 'none', textAlign: 'center', letterSpacing: '8px', fontWeight: 800, boxSizing: 'border-box' }}
+                  />
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={handleSendOtp} style={{ flex: 1, padding: '11px', borderRadius: 12, border: `1px solid ${border}`, background: 'transparent', color: muted, fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer' }}>
+                      Resend
+                    </button>
+                    <button onClick={handleVerifyOtp} disabled={otpValue.length !== 6 || otpStep === 'verifying'}
+                      style={{ flex: 2, padding: '11px', borderRadius: 12, border: 'none', background: 'var(--prime-gradient)', color: '#fff', fontWeight: 700, fontSize: '0.88rem', cursor: 'pointer', opacity: otpValue.length !== 6 ? 0.6 : 1 }}>
+                      {otpStep === 'verifying' ? 'Verifying...' : 'Verify OTP'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </Card>
+      )}
 
       {/* Proof of delivery */}
       {order.deliveryStatus === 'delivered' && (
-        <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #f0f0f2', padding: '16px', marginBottom: 12 }}>
-          <p style={{ margin: '0 0 12px', fontSize: '0.68rem', fontWeight: 800, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.8px' }}>Proof of Delivery</p>
+        <Card>
+          <SLabel label="Proof of Delivery" />
           {order.proofOfDelivery ? (
             <img src={order.proofOfDelivery} alt="Proof" style={{ width: '100%', borderRadius: 10, objectFit: 'cover', maxHeight: 200 }} />
           ) : (
             <>
               <input ref={fileRef} type="file" accept="image/*" capture="environment" className="d-none" onChange={handleProofUpload} />
               <button onClick={() => fileRef.current?.click()} disabled={uploading}
-                style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 50, border: '1.5px dashed #e5e7eb', background: '#fafafa', color: '#666', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', width: '100%', justifyContent: 'center' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '11px 20px', borderRadius: 50, border: `1.5px dashed ${border}`, background: 'transparent', color: muted, fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', width: '100%', justifyContent: 'center', boxSizing: 'border-box' }}>
                 <Camera size={16} /> {uploading ? 'Uploading...' : 'Upload Photo'}
               </button>
             </>
           )}
-        </div>
+        </Card>
       )}
 
       {/* Action button */}
       {flow && (
         <button onClick={handleStatusUpdate} disabled={updating}
-          style={{ width: '100%', padding: '16px', borderRadius: 14, border: 'none', background: 'var(--prime-gradient)', color: '#fff', fontWeight: 800, fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: updating ? 0.7 : 1 }}>
+          style={{ width: '100%', padding: '16px', borderRadius: 14, border: 'none', background: 'var(--prime-gradient)', color: '#fff', fontWeight: 800, fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: updating ? 0.7 : 1, boxShadow: '0 4px 16px rgba(255,107,43,0.3)', boxSizing: 'border-box' }}>
           <CheckCircle2 size={18} /> {updating ? 'Updating...' : flow.label}
         </button>
       )}

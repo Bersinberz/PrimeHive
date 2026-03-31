@@ -72,7 +72,7 @@ export const addAdminStaff = asyncHandler(async (req: Request, res: Response) =>
 });
 
 export const updateAdminStaff = asyncHandler(async (req: Request, res: Response) => {
-  const { name, email, phone, adminStaffPermissions, status } = req.body;
+  const { name, email, phone, adminStaffPermissions, status, password } = req.body;
   const update: Record<string, unknown> = {};
 
   if (name)   update.name   = name.trim();
@@ -88,6 +88,12 @@ export const updateAdminStaff = asyncHandler(async (req: Request, res: Response)
     } catch {
       return res.status(400).json({ message: "Invalid permissions format." });
     }
+  }
+
+  // Handle password change
+  if (password && typeof password === "string") {
+    const user = await User.findOne({ _id: req.params.id, role: "admin_staff" }).select("+password");
+    if (user) { user.password = password; await user.save(); }
   }
 
   const user = await User.findOneAndUpdate(

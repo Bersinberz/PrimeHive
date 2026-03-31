@@ -1,8 +1,8 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Lock, Unlock, Trash2, AlertTriangle, RotateCcw, Edit2, Store, MapPin, Phone, FileText, ShoppingBag, TrendingUp, Package, BarChart2, RefreshCw } from 'lucide-react';
-import type { Staff, StaffStoreStats } from '../../../services/admin/staffService';
-import { resendStaffSetupEmail, getStaffStoreStats } from '../../../services/admin/staffService';
+import type { Staff, StaffStoreStats } from '../../../services/Admin/staffService';
+import { resendStaffSetupEmail, getStaffStoreStats } from '../../../services/Admin/staffService';
 import ActionConfirmModal, { type ActionConfirmType } from '../ActionConfirmModal';
 import DeletionCountdown from '../DeletionCountdown';
 import { useToast } from '../../../context/ToastContext';
@@ -412,3 +412,4 @@ const StaffProfile: React.FC<StaffProfileProps> = ({
 };
 
 export default StaffProfile;
+

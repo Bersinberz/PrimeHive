@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, Package, MapPin, CreditCard, Tag,
   XCircle, RotateCcw, AlertTriangle,
-  ShoppingBag, CreditCard as PayIcon, Settings, Truck, CheckCircle2,
+  ShoppingBag, Settings, Truck, CheckCircle2,
 } from "lucide-react";
 import { getMyOrderById, cancelOrder, requestRefund } from "../../services/storefront/orderService";
 import type { MyOrder } from "../../services/storefront/orderService";
@@ -20,11 +20,17 @@ const STATUS_META: Record<string, { bg: string; color: string; dot: string }> = 
 };
 
 const PIPELINE: { key: string; label: string; sub: string; Icon: React.FC<any> }[] = [
-  { key: "Pending",    label: "Order Placed",   sub: "We've received your order",     Icon: ShoppingBag },
-  { key: "Paid",       label: "Payment Done",   sub: "Payment confirmed",             Icon: PayIcon },
-  { key: "Processing", label: "Processing",     sub: "Preparing your items",          Icon: Settings },
-  { key: "Shipped",    label: "Shipped",        sub: "On the way to you",             Icon: Truck },
-  { key: "Delivered",  label: "Delivered",      sub: "Enjoy your purchase!",          Icon: CheckCircle2 },
+  { key: "Pending",    label: "Order Placed",      sub: "We've received your order",     Icon: ShoppingBag },
+  { key: "Processing", label: "Picked Up",         sub: "Preparing your items",          Icon: Settings },
+  { key: "Shipped",    label: "Out for Delivery",  sub: "On the way to you",             Icon: Truck },
+  { key: "Delivered",  label: "Delivered",         sub: "Enjoy your purchase!",          Icon: CheckCircle2 },
+];
+
+const REFUND_PIPELINE: { key: string; label: string; sub: string; Icon: React.FC<any> }[] = [
+  { key: "refund_requested", label: "Refund Requested", sub: "Waiting for admin review",   Icon: RotateCcw },
+  { key: "refund_accepted",  label: "Refund Accepted",  sub: "Admin approved your refund", Icon: CheckCircle2 },
+  { key: "refund_pickup",    label: "Picked Up",        sub: "Item collected",             Icon: Truck },
+  { key: "Refunded",         label: "Refunded",         sub: "Amount will be credited",    Icon: PayIcon },
 ];
 
 const fmt = (n: number) =>
@@ -111,6 +117,17 @@ const OrderDetailPage: React.FC = () => {
 
   const pipelineIdx = PIPELINE.findIndex(p => p.key === order.status);
 
+  // Refund pipeline index based on refundStatus
+  const refundPipelineIdx = (() => {
+    if (order.status !== "Refunded" && order.refundStatus !== "pending_refund" && order.refundStatus !== "refunded") return -1;
+    if (order.refundStatus === "pending_refund") return 0;
+    if (order.refundStatus === "refunded" && order.status !== "Refunded") return 1;
+    if (order.status === "Refunded") return 3;
+    return 0;
+  })();
+
+  const isRefundFlow = order.refundStatus === "pending_refund" || order.refundStatus === "refunded" || order.status === "Refunded";
+
   const addr = order.shippingAddress;
 
   const label = (text: string) => (
@@ -138,101 +155,83 @@ const OrderDetailPage: React.FC = () => {
         </span>
       </div>
 
-      {/* Amazon-style stepper */}
-      {!isCancelledOrRefunded && pipelineIdx >= 0 && (
+      {/* ── NORMAL ORDER STEPPER ── */}
+      {!isCancelledOrRefunded && !isRefundFlow && pipelineIdx >= 0 && (
         <div className="form-panel mb-4" style={{ padding: '28px 24px' }}>
           <div style={{ position: 'relative' }}>
-            {/* Background track */}
-            <div style={{
-              position: 'absolute', top: 22, left: '10%', right: '10%', height: 3,
-              background: 'var(--bg-surface-3)', borderRadius: 4, zIndex: 0,
-            }} />
-            {/* Filled track */}
-            <motion.div
-              initial={{ width: 0 }}
-              animate={{ width: `${(pipelineIdx / (PIPELINE.length - 1)) * 80}%` }}
-              transition={{ duration: 0.8, ease: 'easeOut' }}
-              style={{
-                position: 'absolute', top: 22, left: '10%', height: 3,
-                background: 'var(--prime-gradient)', borderRadius: 4, zIndex: 1,
-              }}
-            />
-
+            <div style={{ position: 'absolute', top: 22, left: '10%', right: '10%', height: 3, background: 'var(--bg-surface-3)', borderRadius: 4, zIndex: 0 }} />
+            <motion.div initial={{ width: 0 }} animate={{ width: `${(pipelineIdx / (PIPELINE.length - 1)) * 80}%` }} transition={{ duration: 0.8, ease: 'easeOut' }}
+              style={{ position: 'absolute', top: 22, left: '10%', height: 3, background: 'var(--prime-gradient)', borderRadius: 4, zIndex: 1 }} />
             <div className="d-flex justify-content-between" style={{ position: 'relative', zIndex: 2 }}>
               {PIPELINE.map(({ key, label, sub, Icon }, idx) => {
-                const done   = idx < pipelineIdx;
-                const active = idx === pipelineIdx;
-                const future = idx > pipelineIdx;
-                // Find timestamp for this step from timeline
+                const done = idx < pipelineIdx; const active = idx === pipelineIdx; const future = idx > pipelineIdx;
                 const event = order.timeline?.find(t => t.status === key);
-
                 return (
                   <div key={key} className="d-flex flex-column align-items-center" style={{ flex: 1, gap: 10 }}>
-                    {/* Icon circle */}
-                    <motion.div
-                      initial={{ scale: 0.7, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      transition={{ delay: idx * 0.08 }}
-                      style={{
-                        width: 44, height: 44, borderRadius: '50%',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        background: done ? 'var(--prime-gradient)' : active ? 'var(--prime-gradient)' : 'var(--bg-surface-3)',
-                        border: active ? '3px solid var(--prime-orange)' : '3px solid transparent',
-                        boxShadow: active ? '0 0 0 5px rgba(255,140,66,0.15)' : done ? '0 2px 8px rgba(255,140,66,0.25)' : 'none',
-                        transition: 'all 0.3s',
-                      }}
-                    >
+                    <motion.div initial={{ scale: 0.7, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: idx * 0.08 }}
+                      style={{ width: 44, height: 44, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: done || active ? 'var(--prime-gradient)' : 'var(--bg-surface-3)', border: active ? '3px solid var(--prime-orange)' : '3px solid transparent', boxShadow: active ? '0 0 0 5px rgba(255,140,66,0.15)' : done ? '0 2px 8px rgba(255,140,66,0.25)' : 'none', transition: 'all 0.3s' }}>
                       <Icon size={18} color={future ? 'var(--text-muted)' : '#fff'} />
                     </motion.div>
-
-                    {/* Label */}
                     <div className="text-center" style={{ maxWidth: 90 }}>
-                      <p style={{
-                        margin: 0, fontSize: '0.78rem', fontWeight: active ? 800 : done ? 700 : 500,
-                        color: active ? 'var(--prime-orange)' : done ? 'var(--text-primary)' : 'var(--text-muted)',
-                        lineHeight: 1.3,
-                      }}>
-                        {label}
-                      </p>
-                      {event ? (
-                        <p style={{ margin: '3px 0 0', fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-                          {new Date(event.timestamp).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                        </p>
-                      ) : (
-                        <p style={{ margin: '3px 0 0', fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 400 }}>
-                          {future ? sub : ''}
-                        </p>
-                      )}
+                      <p style={{ margin: 0, fontSize: '0.78rem', fontWeight: active ? 800 : done ? 700 : 500, color: active ? 'var(--prime-orange)' : done ? 'var(--text-primary)' : 'var(--text-muted)', lineHeight: 1.3 }}>{label}</p>
+                      {event
+                        ? <p style={{ margin: '3px 0 0', fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 500 }}>{new Date(event.timestamp).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</p>
+                        : <p style={{ margin: '3px 0 0', fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 400 }}>{future ? sub : ''}</p>
+                      }
                     </div>
                   </div>
                 );
               })}
             </div>
           </div>
-
-          {/* Active step description */}
           <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border-color)', textAlign: 'center' }}>
-            <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-              {PIPELINE[pipelineIdx]?.sub}
-            </p>
+            <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{PIPELINE[pipelineIdx]?.sub}</p>
           </div>
         </div>
       )}
 
-      {/* Cancelled / Refunded banner */}
-      {isCancelledOrRefunded && (
+      {/* ── REFUND STEPPER ── */}
+      {isRefundFlow && (
+        <div className="form-panel mb-4" style={{ padding: '28px 24px', border: '1.5px solid rgba(107,114,128,0.2)', background: 'rgba(107,114,128,0.02)' }}>
+          <p style={{ margin: '0 0 20px', fontSize: '0.72rem', fontWeight: 800, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.8px' }}>Refund Progress</p>
+          <div style={{ position: 'relative' }}>
+            <div style={{ position: 'absolute', top: 22, left: '12%', right: '12%', height: 3, background: 'var(--bg-surface-3)', borderRadius: 4, zIndex: 0 }} />
+            <motion.div initial={{ width: 0 }} animate={{ width: `${(refundPipelineIdx / (REFUND_PIPELINE.length - 1)) * 76}%` }} transition={{ duration: 0.8, ease: 'easeOut' }}
+              style={{ position: 'absolute', top: 22, left: '12%', height: 3, background: 'linear-gradient(90deg,#6b7280,#9ca3af)', borderRadius: 4, zIndex: 1 }} />
+            <div className="d-flex justify-content-between" style={{ position: 'relative', zIndex: 2 }}>
+              {REFUND_PIPELINE.map(({ key, label, sub, Icon }, idx) => {
+                const done = idx < refundPipelineIdx; const active = idx === refundPipelineIdx; const future = idx > refundPipelineIdx;
+                return (
+                  <div key={key} className="d-flex flex-column align-items-center" style={{ flex: 1, gap: 10 }}>
+                    <motion.div initial={{ scale: 0.7, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: idx * 0.08 }}
+                      style={{ width: 44, height: 44, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: done || active ? 'linear-gradient(135deg,#6b7280,#9ca3af)' : 'var(--bg-surface-3)', border: active ? '3px solid #6b7280' : '3px solid transparent', boxShadow: active ? '0 0 0 5px rgba(107,114,128,0.15)' : 'none', transition: 'all 0.3s' }}>
+                      <Icon size={18} color={future ? 'var(--text-muted)' : '#fff'} />
+                    </motion.div>
+                    <div className="text-center" style={{ maxWidth: 90 }}>
+                      <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: active ? 800 : done ? 700 : 500, color: active ? '#6b7280' : done ? 'var(--text-primary)' : 'var(--text-muted)', lineHeight: 1.3 }}>{label}</p>
+                      <p style={{ margin: '3px 0 0', fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 400 }}>{future ? sub : ''}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border-color)', textAlign: 'center' }}>
+            <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: 600, color: '#6b7280' }}>{REFUND_PIPELINE[refundPipelineIdx]?.sub}</p>
+          </div>
+        </div>
+      )}
+
+      {/* ── CANCELLED BANNER ── */}
+      {order.status === 'Cancelled' && (
         <div className="form-panel mb-4 d-flex align-items-center gap-3"
-          style={{ background: order.status === 'Cancelled' ? 'rgba(239,68,68,0.05)' : 'rgba(107,114,128,0.05)', border: `1.5px solid ${order.status === 'Cancelled' ? 'rgba(239,68,68,0.2)' : 'rgba(107,114,128,0.2)'}` }}>
-          <div style={{ width: 40, height: 40, borderRadius: '50%', background: order.status === 'Cancelled' ? 'rgba(239,68,68,0.1)' : 'rgba(107,114,128,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            {order.status === 'Cancelled' ? <XCircle size={20} color="#dc2626" /> : <RotateCcw size={20} color="#6b7280" />}
+          style={{ background: 'rgba(239,68,68,0.05)', border: '1.5px solid rgba(239,68,68,0.2)' }}>
+          <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(239,68,68,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <XCircle size={22} color="#dc2626" />
           </div>
           <div>
-            <p style={{ margin: 0, fontWeight: 800, fontSize: '0.95rem', color: order.status === 'Cancelled' ? '#dc2626' : '#6b7280' }}>
-              Order {order.status}
-            </p>
-            <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-              {order.timeline?.slice(-1)[0]?.note || ''}
-            </p>
+            <p style={{ margin: 0, fontWeight: 800, fontSize: '0.95rem', color: '#dc2626' }}>Order Cancelled</p>
+            <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-muted)' }}>{order.timeline?.slice(-1)[0]?.note || 'This order has been cancelled.'}</p>
           </div>
         </div>
       )}

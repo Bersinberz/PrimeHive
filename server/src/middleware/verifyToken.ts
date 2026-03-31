@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
-import User, { IPermissions } from "../models/User";
+import User, { IPermissions, IAdminStaffPermissions } from "../models/User";
 
 /**
  * Verify JWT and attach user (with permissions) to request
@@ -102,7 +102,7 @@ export const superAdminOnly = (
  * Usage: checkPermission('products', 'delete')
  */
 export const checkPermission = (
-  module: keyof IPermissions,
+  module: keyof IPermissions | keyof IAdminStaffPermissions,
   action: string
 ) => (req: Request, res: Response, next: NextFunction) => {
   if (!req.user) return res.status(401).json({ message: "Not authorized" });

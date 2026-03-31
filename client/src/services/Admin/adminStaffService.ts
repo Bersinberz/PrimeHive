@@ -7,6 +7,7 @@ export interface AdminStaffPermissions {
   offers:    { view: boolean; create: boolean; edit: boolean; delete: boolean };
   reviews:   { view: boolean; moderate: boolean; delete: boolean };
   returns:   { view: boolean; process: boolean };
+  delivery:  { view: boolean; create: boolean; edit: boolean; delete: boolean };
 }
 
 export interface AdminStaffMember {
@@ -26,6 +27,7 @@ export const DEFAULT_ADMIN_STAFF_PERMISSIONS: AdminStaffPermissions = {
   offers:    { view: true,  create: false, edit: false, delete: false },
   reviews:   { view: true,  moderate: false, delete: false },
   returns:   { view: true,  process: false },
+  delivery:  { view: false, create: false, edit: false, delete: false },
 };
 
 export const getAdminStaff = async (): Promise<AdminStaffMember[]> => {

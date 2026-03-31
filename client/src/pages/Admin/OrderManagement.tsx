@@ -19,7 +19,10 @@ const OrderManagement: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [newStatus, setNewStatus] = useState<OrderStatus | ''>('');
 
-  const PIPELINE_STEPS: OrderStatus[] = ['Pending', 'Paid', 'Processing', 'Shipped', 'Delivered'];
+  const PIPELINE_STEPS: OrderStatus[] = ['Pending', 'Processing', 'Shipped', 'Delivered'];
+  const PIPELINE_LABELS: Record<string, string> = {
+    Pending: 'Order Placed', Processing: 'Picked Up', Shipped: 'Out for Delivery', Delivered: 'Delivered',
+  };
   const DANGER_STEPS: OrderStatus[] = ['Cancelled', 'Refunded'];
 
   const getStepIndex = (status: OrderStatus) => PIPELINE_STEPS.indexOf(status);
@@ -297,22 +300,90 @@ const OrderManagement: React.FC = () => {
 
                   {/* Timeline */}
                   <div style={{ background: '#fff', borderRadius: '20px', border: '1px solid #f0f0f2', padding: '24px' }}>
-                    <p style={{ fontSize: '0.72rem', fontWeight: 800, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.8px', margin: '0 0 4px' }}>
-                      History
-                    </p>
-                    <h5 style={{ fontWeight: 900, color: '#1a1a1a', fontSize: '1.1rem', margin: '0 0 20px', letterSpacing: '-0.3px' }}>
-                      Order Timeline
-                    </h5>
+                    <p style={{ fontSize: '0.72rem', fontWeight: 800, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.8px', margin: '0 0 4px' }}>History</p>
+                    <h5 style={{ fontWeight: 900, color: '#1a1a1a', fontSize: '1.1rem', margin: '0 0 16px', letterSpacing: '-0.3px' }}>Order Timeline</h5>
+
+                    {/* Visual stepper */}
+                    {!['Cancelled', 'Refunded'].includes(selectedOrder.status) && (() => {
+                      const curIdx = getStepIndex(selectedOrder.status as OrderStatus);
+                      return curIdx >= 0 ? (
+                        <div style={{ marginBottom: 20, paddingBottom: 20, borderBottom: '1px solid #f0f0f2' }}>
+                          <div style={{ display: 'flex', alignItems: 'center' }}>
+                            {PIPELINE_STEPS.map((step, idx) => {
+                              const done = idx < curIdx; const active = idx === curIdx;
+                              return (
+                                <React.Fragment key={step}>
+                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                                    <div style={{ width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: done ? '#10b981' : active ? 'var(--prime-gradient)' : '#f0f0f2', border: active ? '2px solid var(--prime-orange)' : 'none', transition: 'all 0.3s' }}>
+                                      {done
+                                        ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                        : <div style={{ width: 8, height: 8, borderRadius: '50%', background: active ? '#fff' : '#ccc' }} />
+                                      }
+                                    </div>
+                                    <span style={{ fontSize: '0.58rem', fontWeight: 700, color: done ? '#10b981' : active ? 'var(--prime-orange)' : '#bbb', textAlign: 'center', maxWidth: 56, lineHeight: 1.3 }}>
+                                      {PIPELINE_LABELS[step]}
+                                    </span>
+                                  </div>
+                                  {idx < PIPELINE_STEPS.length - 1 && (
+                                    <div style={{ flex: 1, height: 2, background: idx < curIdx ? '#10b981' : '#f0f0f2', margin: '0 4px', marginBottom: 22, transition: 'background 0.3s' }} />
+                                  )}
+                                </React.Fragment>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : null;
+                    })()}
+
+                    {/* Cancelled banner */}
+                    {selectedOrder.status === 'Cancelled' && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', background: 'rgba(239,68,68,0.05)', border: '1.5px solid rgba(239,68,68,0.2)', borderRadius: 12, marginBottom: 16 }}>
+                        <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(239,68,68,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                        </div>
+                        <div>
+                          <p style={{ margin: 0, fontWeight: 800, fontSize: '0.88rem', color: '#dc2626' }}>Order Cancelled</p>
+                          <p style={{ margin: 0, fontSize: '0.75rem', color: '#aaa' }}>{selectedOrder.timeline?.slice(-1)[0]?.note || 'Cancelled'}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Refund stepper */}
+                    {(selectedOrder.status === 'Refunded' || (selectedOrder as any).refundStatus === 'pending_refund') && (() => {
+                      const rs = (selectedOrder as any).refundStatus;
+                      const rIdx = rs === 'pending_refund' ? 0 : rs === 'refunded' && selectedOrder.status !== 'Refunded' ? 1 : selectedOrder.status === 'Refunded' ? 3 : 0;
+                      const rSteps = ['Refund Requested', 'Refund Accepted', 'Picked Up', 'Refunded'];
+                      return (
+                        <div style={{ marginBottom: 16, padding: '14px 16px', background: 'rgba(107,114,128,0.04)', border: '1px solid rgba(107,114,128,0.15)', borderRadius: 12 }}>
+                          <p style={{ margin: '0 0 12px', fontSize: '0.65rem', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.8px' }}>Refund Progress</p>
+                          <div style={{ display: 'flex', alignItems: 'center' }}>
+                            {rSteps.map((label, idx) => (
+                              <React.Fragment key={label}>
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
+                                  <div style={{ width: 24, height: 24, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: idx <= rIdx ? 'linear-gradient(135deg,#6b7280,#9ca3af)' : '#f0f0f2' }}>
+                                    {idx < rIdx
+                                      ? <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                      : <div style={{ width: 6, height: 6, borderRadius: '50%', background: idx === rIdx ? '#fff' : '#ccc' }} />
+                                    }
+                                  </div>
+                                  <span style={{ fontSize: '0.55rem', fontWeight: 700, color: idx <= rIdx ? '#6b7280' : '#ccc', textAlign: 'center', maxWidth: 48, lineHeight: 1.3 }}>{label}</span>
+                                </div>
+                                {idx < rSteps.length - 1 && <div style={{ flex: 1, height: 2, background: idx < rIdx ? '#9ca3af' : '#f0f0f2', margin: '0 3px', marginBottom: 18 }} />}
+                              </React.Fragment>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Activity log */}
                     <div style={{ position: 'relative', paddingLeft: '20px', borderLeft: '2px solid #f0f0f2' }}>
                       {selectedOrder.timeline.map((event, idx) => (
                         <div key={idx} style={{ position: 'relative', marginBottom: '20px', paddingLeft: '20px' }}>
-                          <span style={{
-                            position: 'absolute', left: '-27px', top: '2px',
-                            width: '14px', height: '14px', borderRadius: '50%',
-                            background: 'var(--prime-orange)', border: '2px solid #fff',
-                            display: 'block',
-                          }} />
-                          <div style={{ fontWeight: 700, color: '#1a1a1a', fontSize: '0.9rem' }}>{event.status}</div>
+                          <span style={{ position: 'absolute', left: '-27px', top: '2px', width: '14px', height: '14px', borderRadius: '50%', background: 'var(--prime-orange)', border: '2px solid #fff', display: 'block' }} />
+                          <div style={{ fontWeight: 700, color: '#1a1a1a', fontSize: '0.9rem' }}>
+                            {PIPELINE_LABELS[event.status] || event.status}
+                          </div>
                           <div style={{ fontSize: '0.75rem', color: '#bbb', fontWeight: 500, marginTop: '2px' }}>
                             {formatDate(event.timestamp)} · {formatTime(event.timestamp)}
                           </div>
@@ -390,7 +461,7 @@ const OrderManagement: React.FC = () => {
                                   color: isCurrent ? '#fff' : isDone ? 'rgba(255,255,255,0.5)' : isNext ? '#fff' : 'rgba(255,255,255,0.3)',
                                   flex: 1, textAlign: 'left',
                                 }}>
-                                  {step}
+                                  {PIPELINE_LABELS[step] || step}
                                 </span>
                                 {isCurrent && (
                                   <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)', background: 'rgba(255,255,255,0.15)', padding: '2px 8px', borderRadius: '20px' }}>

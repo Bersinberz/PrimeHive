@@ -8,7 +8,7 @@ import {
     hardDeleteStaff,
     revokeStaffDeletion,
     type Staff,
-} from '../../services/admin/staffService';
+} from '../../services/Admin/staffService';
 import { useToast } from '../../context/ToastContext';
 import PrimeLoader from '../../components/PrimeLoader';
 
@@ -92,7 +92,7 @@ const StaffManagement: React.FC = () => {
 
     const handleEditStaff = async (e: React.FormEvent) => {
         e.preventDefault();
-        import('../../services/admin/staffService').then(async ({ updateStaff }) => {
+        import('../../services/Admin/staffService').then(async ({ updateStaff }) => {
             if (!selectedStaff) return;
             setIsSaving(true);
             try {

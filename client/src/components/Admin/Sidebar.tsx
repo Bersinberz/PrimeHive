@@ -159,6 +159,12 @@ const Sidebar: React.FC = () => {
           </NavGroup>
         )}
 
+        {isAdminStaff && (user as any)?.adminStaffPermissions?.delivery?.view && (
+          <NavGroup label="People">
+            <NavItem path="/admin/delivery-partners" label="Delivery Partners" icon={I.delivery} />
+          </NavGroup>
+        )}
+
         {isSuperAdmin && (
           <NavGroup label="Insights">
             <NavItem path="/admin/analytics" label="Analytics" icon={I.analytics} />

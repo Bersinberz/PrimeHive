@@ -52,6 +52,10 @@ export interface IOrder extends Document {
     deliveryPartnerId?: mongoose.Types.ObjectId;
     deliveryStatus?: "not_assigned" | "assigned" | "picked_up" | "out_for_delivery" | "delivered";
     proofOfDelivery?: string;
+    deliveryOtp?: string;
+    deliveryOtpExpires?: Date;
+    deliveryOtpVerified?: boolean;
+    assignedAt?: Date;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -147,6 +151,10 @@ const OrderSchema = new Schema<IOrder>(
             default: "not_assigned",
         },
         proofOfDelivery: { type: String, default: null },
+        deliveryOtp: { type: String, default: null },
+        deliveryOtpExpires: { type: Date, default: null },
+        deliveryOtpVerified: { type: Boolean, default: false },
+        assignedAt: { type: Date, default: null },
         refundStatus: {
             type: String,
             enum: ["none", "pending_refund", "refunded", "rejected"],

@@ -53,6 +53,15 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
         if (!modulePerms?.view) return <AccessDenied />;
     }
 
+    // ── admin_staff delivery check (no Permissions key, checked via allowedRoles + adminStaffPermissions) ──
+    if (!permission && user?.role === "admin_staff") {
+        const path = window.location.pathname;
+        if (path.includes("delivery-partners")) {
+            const adminPerms = (user as any).adminStaffPermissions as Record<string, any> | null | undefined;
+            if (adminPerms && adminPerms.delivery?.view !== true) return <AccessDenied />;
+        }
+    }
+
     return <>{children}</>;
 };
 
